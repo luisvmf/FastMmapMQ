@@ -61,17 +61,17 @@ int search(char *fname, char *str) {
 	int line_num = 1;
 	int find_result = 0;
 	int isearch=0;
-	char temp[memmappedarraysize+35];
-	while(isearch<memmappedarraysize+35){
+	char temp[350];
+	while(isearch<350){
 		temp[isearch]='\0';
 		isearch=isearch+1;
 	}
 	if((fp=fopen(fname,"r"))==NULL){
 		return 0;
 	}
-	while(fgets(temp, memmappedarraysize+35, fp)!=NULL){
+	while(fgets(temp, 350, fp)!=NULL){
 		isearch=0;
-		while(isearch<memmappedarraysize+35){
+		while(isearch<350){
 			if(temp[isearch]=='\0'){
 				if((temp[isearch+1]!='\0') || (temp[isearch+2]!='\0') || (temp[isearch+3]!='\0') || (temp[isearch+4]!='\0')){
 					temp[isearch]=' ';
