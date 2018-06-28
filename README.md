@@ -2,7 +2,11 @@
 Fast Message queue Python module written in C using a memory mapped file in /dev/shm
 
 ./build-python.sh
+
 ./build-node.sh
+
+./build-c.sh
+
 python tests.py
 
 	Tests:
@@ -33,4 +37,8 @@ python tests.py
 	aaab aaab aaab 
 	aaac 
 	test 
+	
+./test
+
+	aaab aaab
 
