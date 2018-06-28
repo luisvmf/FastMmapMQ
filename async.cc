@@ -259,7 +259,8 @@ int startmemmap(char *programlocation,char *id){
 	dataposb[4]=map[currentcreatedmapindex-1][4];
 	dataposb[5]=map[currentcreatedmapindex-1][5];
 	dataposb[6]=map[currentcreatedmapindex-1][6];
-	indexb=atoi(dataposb);//-17  (estava funcionando assim no python)???
+	//indexb=atoi(dataposb);//-17  (estava funcionando assim no python)???
+	indexb=0;
 	map[currentcreatedmapindex-1][shmsize-40]=id[0];
 	map[currentcreatedmapindex-1][shmsize-39]=id[1];
 	map[currentcreatedmapindex-1][shmsize-38]=id[2];
