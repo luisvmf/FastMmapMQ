@@ -185,20 +185,23 @@ int openfd(char *programlocation,char *id){
 	currentcreatedmapindex=currentcreatedmapindex+1;
 	return currentcreatedmapindex-1;
 }
-void initshm(){
+int initshm(){
 	int lseekresult;
 	lseekresult = lseek(fd[currentcreatedmapindex-1], shmsize-1, SEEK_SET);
 	if (lseekresult == -1) {
 		close(fd[currentcreatedmapindex-1]);
-		perror("Error on lseek");
-		exit(EXIT_FAILURE);
+		//perror("Error on lseek");
+		//exit(EXIT_FAILURE);
+		return -1;
 	}
 	lseekresult = write(fd[currentcreatedmapindex-1], "", 1);
 	if (lseekresult != 1) {
 		close(fd[currentcreatedmapindex-1]);
-		perror("Error on shared memory initialization");
-		exit(EXIT_FAILURE);
+		//perror("Error on shared memory initialization");
+		//exit(EXIT_FAILURE);
+		return -1;
 	}
+	return 0;
 }
 void creatememmap(){
 	map[currentcreatedmapindex-1] = mmap(0, shmsize, PROT_READ | PROT_WRITE, MAP_SHARED, fd[currentcreatedmapindex-1], 0);
@@ -210,81 +213,85 @@ void creatememmap(){
 }
 int startmemmap(char *programlocation,char *id){
 	int thismapindex=openfd(programlocation,id);
-	initshm();
-	creatememmap();
-	char strab[9]="";
-	char *dataposb;
-	dataposb=strab;
-	indexb=0;
-	if(map[currentcreatedmapindex-1][7]!='\x17'){
-		map[currentcreatedmapindex-1][0]='0';
-		map[currentcreatedmapindex-1][1]='0';
-		map[currentcreatedmapindex-1][2]='0';
-		map[currentcreatedmapindex-1][3]='0';
-		map[currentcreatedmapindex-1][4]='0';
-		map[currentcreatedmapindex-1][5]='0';
-		map[currentcreatedmapindex-1][6]='0';
-		map[currentcreatedmapindex-1][8]='0';
-		map[currentcreatedmapindex-1][9]='0';
-		map[currentcreatedmapindex-1][10]='0';
-		map[currentcreatedmapindex-1][11]='0';
-		map[currentcreatedmapindex-1][12]='0';
-		map[currentcreatedmapindex-1][13]='0';
-		map[currentcreatedmapindex-1][14]='0';
-		map[currentcreatedmapindex-1][15]='0';
-		map[currentcreatedmapindex-1][16]='0';
+	int openedshmstatus=initshm();
+	if(openedshmstatus==0){
+		creatememmap();
+		char strab[9]="";
+		char *dataposb;
+		dataposb=strab;
+		indexb=0;
+		if(map[currentcreatedmapindex-1][7]!='\x17'){
+			map[currentcreatedmapindex-1][0]='0';
+			map[currentcreatedmapindex-1][1]='0';
+			map[currentcreatedmapindex-1][2]='0';
+			map[currentcreatedmapindex-1][3]='0';
+			map[currentcreatedmapindex-1][4]='0';
+			map[currentcreatedmapindex-1][5]='0';
+			map[currentcreatedmapindex-1][6]='0';
+			map[currentcreatedmapindex-1][8]='0';
+			map[currentcreatedmapindex-1][9]='0';
+			map[currentcreatedmapindex-1][10]='0';
+			map[currentcreatedmapindex-1][11]='0';
+			map[currentcreatedmapindex-1][12]='0';
+			map[currentcreatedmapindex-1][13]='0';
+			map[currentcreatedmapindex-1][14]='0';
+			map[currentcreatedmapindex-1][15]='0';
+			map[currentcreatedmapindex-1][16]='0';
+		}
+		map[currentcreatedmapindex-1][7]='\x17';
+		dataposb[0]=map[currentcreatedmapindex-1][0];
+		dataposb[1]=map[currentcreatedmapindex-1][1];
+		dataposb[2]=map[currentcreatedmapindex-1][2];
+		dataposb[3]=map[currentcreatedmapindex-1][3];
+		dataposb[4]=map[currentcreatedmapindex-1][4];
+		dataposb[5]=map[currentcreatedmapindex-1][5];
+		dataposb[6]=map[currentcreatedmapindex-1][6];
+		//indexb=atoi(dataposb);//-17 ???.
+		indexb=0;
+		map[currentcreatedmapindex-1][shmsize-40]=id[0];
+		map[currentcreatedmapindex-1][shmsize-39]=id[1];
+		map[currentcreatedmapindex-1][shmsize-38]=id[2];
+		map[currentcreatedmapindex-1][shmsize-37]=id[3];
+		map[currentcreatedmapindex-1][shmsize-36]=id[4];
+		map[currentcreatedmapindex-1][shmsize-35]=id[5];
+		map[currentcreatedmapindex-1][shmsize-34]=id[6];
+		map[currentcreatedmapindex-1][shmsize-33]=id[7];
+		map[currentcreatedmapindex-1][shmsize-32]=id[8];
+		map[currentcreatedmapindex-1][shmsize-31]=id[9];
+		map[currentcreatedmapindex-1][shmsize-30]=id[10];
+		map[currentcreatedmapindex-1][shmsize-29]=id[11];
+		map[currentcreatedmapindex-1][shmsize-28]=id[12];
+		map[currentcreatedmapindex-1][shmsize-27]=id[13];
+		map[currentcreatedmapindex-1][shmsize-26]=id[14];
+		map[currentcreatedmapindex-1][shmsize-25]=id[15];
+		map[currentcreatedmapindex-1][shmsize-24]=id[16];
+		map[currentcreatedmapindex-1][shmsize-23]=id[17];
+		map[currentcreatedmapindex-1][shmsize-22]=id[18];
+		map[currentcreatedmapindex-1][shmsize-21]=id[19];
+		map[currentcreatedmapindex-1][shmsize-20]='l';
+		map[currentcreatedmapindex-1][shmsize-19]='u';
+		map[currentcreatedmapindex-1][shmsize-18]='i';
+		map[currentcreatedmapindex-1][shmsize-17]='s';
+		map[currentcreatedmapindex-1][shmsize-16]='v';
+		map[currentcreatedmapindex-1][shmsize-15]='m';
+		map[currentcreatedmapindex-1][shmsize-14]='f';
+		map[currentcreatedmapindex-1][shmsize-13]='f';
+		map[currentcreatedmapindex-1][shmsize-12]='a';
+		map[currentcreatedmapindex-1][shmsize-11]='s';
+		map[currentcreatedmapindex-1][shmsize-10]='t';
+		map[currentcreatedmapindex-1][shmsize-9]='m';
+		map[currentcreatedmapindex-1][shmsize-8]='m';
+		map[currentcreatedmapindex-1][shmsize-7]='a';
+		map[currentcreatedmapindex-1][shmsize-6]='p';
+		map[currentcreatedmapindex-1][shmsize-5]='m';
+		map[currentcreatedmapindex-1][shmsize-4]='q';
+		map[currentcreatedmapindex-1][shmsize-3]='\x17';
+		map[currentcreatedmapindex-1][shmsize-2]='\x17';
+		map[currentcreatedmapindex-1][shmsize-1]='\x17';
+		return thismapindex;
+	}else{
+		return -1;
 	}
-	map[currentcreatedmapindex-1][7]='\x17';
-	dataposb[0]=map[currentcreatedmapindex-1][0];
-	dataposb[1]=map[currentcreatedmapindex-1][1];
-	dataposb[2]=map[currentcreatedmapindex-1][2];
-	dataposb[3]=map[currentcreatedmapindex-1][3];
-	dataposb[4]=map[currentcreatedmapindex-1][4];
-	dataposb[5]=map[currentcreatedmapindex-1][5];
-	dataposb[6]=map[currentcreatedmapindex-1][6];
-	//indexb=atoi(dataposb);//-17 ???.
-	indexb=0;
-	map[currentcreatedmapindex-1][shmsize-40]=id[0];
-	map[currentcreatedmapindex-1][shmsize-39]=id[1];
-	map[currentcreatedmapindex-1][shmsize-38]=id[2];
-	map[currentcreatedmapindex-1][shmsize-37]=id[3];
-	map[currentcreatedmapindex-1][shmsize-36]=id[4];
-	map[currentcreatedmapindex-1][shmsize-35]=id[5];
-	map[currentcreatedmapindex-1][shmsize-34]=id[6];
-	map[currentcreatedmapindex-1][shmsize-33]=id[7];
-	map[currentcreatedmapindex-1][shmsize-32]=id[8];
-	map[currentcreatedmapindex-1][shmsize-31]=id[9];
-	map[currentcreatedmapindex-1][shmsize-30]=id[10];
-	map[currentcreatedmapindex-1][shmsize-29]=id[11];
-	map[currentcreatedmapindex-1][shmsize-28]=id[12];
-	map[currentcreatedmapindex-1][shmsize-27]=id[13];
-	map[currentcreatedmapindex-1][shmsize-26]=id[14];
-	map[currentcreatedmapindex-1][shmsize-25]=id[15];
-	map[currentcreatedmapindex-1][shmsize-24]=id[16];
-	map[currentcreatedmapindex-1][shmsize-23]=id[17];
-	map[currentcreatedmapindex-1][shmsize-22]=id[18];
-	map[currentcreatedmapindex-1][shmsize-21]=id[19];
-	map[currentcreatedmapindex-1][shmsize-20]='l';
-	map[currentcreatedmapindex-1][shmsize-19]='u';
-	map[currentcreatedmapindex-1][shmsize-18]='i';
-	map[currentcreatedmapindex-1][shmsize-17]='s';
-	map[currentcreatedmapindex-1][shmsize-16]='v';
-	map[currentcreatedmapindex-1][shmsize-15]='m';
-	map[currentcreatedmapindex-1][shmsize-14]='f';
-	map[currentcreatedmapindex-1][shmsize-13]='f';
-	map[currentcreatedmapindex-1][shmsize-12]='a';
-	map[currentcreatedmapindex-1][shmsize-11]='s';
-	map[currentcreatedmapindex-1][shmsize-10]='t';
-	map[currentcreatedmapindex-1][shmsize-9]='m';
-	map[currentcreatedmapindex-1][shmsize-8]='m';
-	map[currentcreatedmapindex-1][shmsize-7]='a';
-	map[currentcreatedmapindex-1][shmsize-6]='p';
-	map[currentcreatedmapindex-1][shmsize-5]='m';
-	map[currentcreatedmapindex-1][shmsize-4]='q';
-	map[currentcreatedmapindex-1][shmsize-3]='\x17';
-	map[currentcreatedmapindex-1][shmsize-2]='\x17';
-	map[currentcreatedmapindex-1][shmsize-1]='\x17';
-	return thismapindex;
 }
 void addresetcounter(int thismapindexreset){
 	char stra[9]="";
