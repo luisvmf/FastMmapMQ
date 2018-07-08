@@ -22,28 +22,28 @@
 //---------------------------------------------------------
 #define memmappedarraysize  (bufferlength+100)
 #define shmsize (memmappedarraysize * sizeof(char))
-int fd[];
-volatile char *map[];
+int fd[bufferlength];
+volatile char *map[bufferlength+200];
 int currentcreatedmapindex=0;
-int readpos;
-int indexb=0;
+int indexb[bufferlength]={0};
 int searchb(char *fname, char *str) {
 	FILE *fp;
 	int line_num = 1;
 	int find_result = 0;
-	char temp[memmappedarraysize+35];
+	char temp[45+35];
 	if((fp=fopen(fname,"r"))==NULL){
 		return 0;
 	}
-	while(fgets(temp, memmappedarraysize+35, fp)!=NULL){
+	lseek((intptr_t)fp, shmsize-45, SEEK_SET);
+	while(fgets(temp,45, fp)!=NULL){
 		int isearch=0;
-		while(isearch<memmappedarraysize+35){
+		while(isearch<45){
 			if(temp[isearch]=='\0'){
 				temp[isearch]='\x17';
 			}
 			isearch=isearch+1;
 		}
-		temp[memmappedarraysize+34]='\0';
+		temp[45+34]='\0';
 		if((strstr(temp, str))!=NULL){
 			return 1;
 			find_result++;
@@ -184,25 +184,95 @@ int openfd(char *programlocation,char *id){
 	currentcreatedmapindex=currentcreatedmapindex+1;
 	return currentcreatedmapindex-1;
 }
-int initshm(){
+int initshm(void){
 	int lseekresult;
 	lseekresult = lseek(fd[currentcreatedmapindex-1], shmsize-1, SEEK_SET);
 	if (lseekresult == -1) {
 		close(fd[currentcreatedmapindex-1]);
-		//perror("Error on lseek");
-		//exit(EXIT_FAILURE);
 		return -1;
 	}
 	lseekresult = write(fd[currentcreatedmapindex-1], "", 1);
 	if (lseekresult != 1) {
 		close(fd[currentcreatedmapindex-1]);
-		//perror("Error on shared memory initialization");
-		//exit(EXIT_FAILURE);
 		return -1;
 	}
 	return 0;
 }
-void creatememmap(){
+
+void listmmaps(char *programlocation,char *foundmaps[],int maxmapfindnum){
+			int foundmapcounter=0;
+			int foundfile=0;
+			DIR *d;
+			struct dirent *dir;
+			d=opendir("/proc/");
+			if(d){
+			while((dir=readdir(d))!=NULL){
+			if(foundfile==1){
+				break;
+			}
+			int tmpnum = atoi(dir->d_name);
+			if(tmpnum==0&&(dir->d_name)[0]!='0'){}else{
+				char *cmdlineuri;
+				cmdlineuri=malloc(strlen((dir->d_name))+strlen("/proc//cmdline")+1);
+				strcpy(cmdlineuri, "/proc/");
+				strcat(cmdlineuri, (dir->d_name));
+				strcat(cmdlineuri, "/cmdline");
+				if(search(cmdlineuri,programlocation)){
+				char *cmdlinefduri;
+				cmdlinefduri=malloc(strlen((dir->d_name))+strlen("/proc//fd/")+1);
+				strcpy(cmdlinefduri, "/proc/");
+				strcat(cmdlinefduri, (dir->d_name));
+				strcat(cmdlinefduri, "/fd/");
+				DIR *db;
+				struct dirent *dirb;
+				db=opendir(cmdlinefduri);
+				if(db){
+				while((dirb=readdir(db))!=NULL){
+				int tmpnumb = atoi(dirb->d_name);
+				if(tmpnumb==0&&(dirb->d_name)[0]!='0'){}else{
+						char *cmdlinefduric;
+						cmdlinefduric=malloc(strlen((dir->d_name))+strlen("/proc//fd/")+1+5);
+						strcpy(cmdlinefduric, "/proc/");
+						strcat(cmdlinefduric, (dir->d_name));
+						strcat(cmdlinefduric, "/fd/");
+						strcat(cmdlinefduric, (dirb->d_name));
+						struct stat sb;
+						if(stat(cmdlinefduric, &sb)!=-1){
+							if(S_ISREG(sb.st_mode)){
+								if(searchb(cmdlinefduric,"luisvmffastmmapmq")){
+									//char *cmdlinefduric is the file uri in /proc for an unlinked fastmmapmq adress owened by program with cmdline containing char *programlocation!
+									//Lets check if this file contains char *id
+									int intsearchmapcounter=0;
+									int tempmmapfd=open(cmdlinefduric, O_RDWR | O_CREAT, (mode_t)0600);
+									char *tempmmap;
+									tempmmap=mmap(0, shmsize, PROT_READ | PROT_WRITE, MAP_SHARED, tempmmapfd, 0);
+									foundmaps[foundmapcounter]=malloc(180);
+									while(intsearchmapcounter<19){
+										if(maxmapfindnum==foundmapcounter){
+											foundfile=1;
+											break;
+										}
+										foundmaps[foundmapcounter][intsearchmapcounter]=tempmmap[shmsize-40+intsearchmapcounter];
+										intsearchmapcounter=intsearchmapcounter+1;
+										foundfile=1;
+									}
+									munmap(tempmmap,shmsize);
+									close(tempmmapfd);
+									foundmapcounter=foundmapcounter+1;
+								}
+							}
+						}
+				}
+				}
+				closedir(db);
+				}
+				}
+			}
+			}
+			closedir(d);
+			}
+}
+void creatememmap(void){
 	map[currentcreatedmapindex-1] = mmap(0, shmsize, PROT_READ | PROT_WRITE, MAP_SHARED, fd[currentcreatedmapindex-1], 0);
 	if (map[currentcreatedmapindex-1] == MAP_FAILED) {
 		close(fd[currentcreatedmapindex-1]);
@@ -218,7 +288,7 @@ int startmemmap(char *programlocation,char *id){
 		char strab[9]="";
 		char *dataposb;
 		dataposb=strab;
-		indexb=0;
+		indexb[currentcreatedmapindex-1]=0;
 		if(map[currentcreatedmapindex-1][7]!='\x17'){
 			map[currentcreatedmapindex-1][0]='0';
 			map[currentcreatedmapindex-1][1]='0';
@@ -245,8 +315,7 @@ int startmemmap(char *programlocation,char *id){
 		dataposb[4]=map[currentcreatedmapindex-1][4];
 		dataposb[5]=map[currentcreatedmapindex-1][5];
 		dataposb[6]=map[currentcreatedmapindex-1][6];
-		//indexb=atoi(dataposb);//-17 ???.
-		indexb=0;
+		indexb[currentcreatedmapindex-1]=0;
 		map[currentcreatedmapindex-1][shmsize-40]=id[0];
 		map[currentcreatedmapindex-1][shmsize-39]=id[1];
 		map[currentcreatedmapindex-1][shmsize-38]=id[2];
@@ -312,7 +381,8 @@ int writemmap(int writemapindexselect,  char *s) {
 	//This is to avoid race between multiple threads.
 	while(map[writemapindexselect][shmsize-42]=='A'){
 	}
-	map[writemapindexselect][shmsize-42]='A';
+	while(map[writemapindexselect][shmsize-41]=='A'){
+	}
 	datapos[0]=map[writemapindexselect][0];
 	datapos[1]=map[writemapindexselect][1];
 	datapos[2]=map[writemapindexselect][2];
@@ -332,6 +402,7 @@ int writemmap(int writemapindexselect,  char *s) {
 	int resetwriteposf=0;
 	int oldiwrite=0;
 	while(i<=lenscalc+index){
+		if((i-1)<bufferlength+100)
 		map[writemapindexselect][i-1]=s[i-index];
 		i=i+1;
 		oldiwrite=i;
@@ -347,10 +418,12 @@ int writemmap(int writemapindexselect,  char *s) {
 		addresetcounter(writemapindexselect);
 		i=18;
 		while(i<=lenscalc+18-(oldiwrite-index)){
+			if((i-1)<bufferlength+100)
 			map[writemapindexselect][i-1]=s[oldiwrite+i-index-18];
 			i=i+1;
 		}
 	}
+	if((i-2)<bufferlength+100)
 	map[writemapindexselect][i-2]=' ';
 	index=i-1;
 	int vca=index/1000000;
@@ -366,6 +439,7 @@ int writemmap(int writemapindexselect,  char *s) {
 	int vcf=(aux)/10;
 	aux=aux-vcf*10;
 	int vcg=(aux);
+	map[writemapindexselect][shmsize-42]='A';
 	map[writemapindexselect][0]=vca+'0';
 	map[writemapindexselect][1]=vcb+'0';
 	map[writemapindexselect][2]=vcc+'0';
@@ -400,6 +474,8 @@ char *readmmap(int readmapindexselect,int gfifghdughfid) {
 		//This is to avoid race between multiple threads.
 		while(map[readmapindexselect][shmsize-41]=='A'){
 		}
+		while(map[readmapindexselect][shmsize-42]=='A'){
+		}
 		char stra[maxmemreturnsize+100]="";
 		char *tmpstr;
 		tmpstr=stra;
@@ -417,7 +493,7 @@ char *readmmap(int readmapindexselect,int gfifghdughfid) {
 		index=atoi(datapos);
 		char *dataposb;
 		dataposb=strab;
-		indexb=0;
+		indexb[readmapindexselect]=0;
 		dataposb[0]=map[readmapindexselect][8];
 		dataposb[1]=map[readmapindexselect][9];
 		dataposb[2]=map[readmapindexselect][10];
@@ -425,17 +501,15 @@ char *readmmap(int readmapindexselect,int gfifghdughfid) {
 		dataposb[4]=map[readmapindexselect][12];
 		dataposb[5]=map[readmapindexselect][13];
 		dataposb[6]=map[readmapindexselect][14];
-		indexb=atoi(dataposb);
+		indexb[readmapindexselect]=atoi(dataposb);
 		char *dataposbc;
 		dataposbc=strab;
-		int indexc=0;
 		sprintf(dataposbc,"%c%c",map[readmapindexselect][15],map[readmapindexselect][16]);
-		indexc=atoi(dataposbc);
-		int i=indexb+17;
-		if(indexb==index-17){
+		int i=indexb[readmapindexselect]+17;
+		if(indexb[readmapindexselect]==index-17){
 			return "";
 		}else{
-		if(indexb==index){
+		if(indexb[readmapindexselect]==index){
 		if(index==0){
 			return "";
 		}
@@ -443,23 +517,27 @@ char *readmmap(int readmapindexselect,int gfifghdughfid) {
 		if(i>=index){
 			int offsetretarray=0;
 			while(i<bufferlength+17){
-				tmpstr[i-indexb-17]=map[readmapindexselect][i];
+				if((i)<bufferlength+100)
+				tmpstr[i-indexb[readmapindexselect]-17]=map[readmapindexselect][i];
+				if((i)<bufferlength+100){
 				if(map[readmapindexselect][i]=='\0'){
-					tmpstr[i-indexb-17]=' ';
-				}
+					tmpstr[i-indexb[readmapindexselect]-17]=' ';
+				}}
 				i=i+1;
 				if(i>=maxmemreturnsize+17){
 					break;
 				}
 			}
-			offsetretarray=i-indexb-17;
-			indexb=0;
-			i=indexb+17;
+			offsetretarray=i-indexb[readmapindexselect]-17;
+			indexb[readmapindexselect]=0;
+			i=indexb[readmapindexselect]+17;
 			while(i<index){
-				tmpstr[offsetretarray+i-indexb-17]=map[readmapindexselect][i];
+				if((i)<bufferlength+100)
+				tmpstr[offsetretarray+i-indexb[readmapindexselect]-17]=map[readmapindexselect][i];
+				if((i)<bufferlength+100){
 				if(map[readmapindexselect][i]=='\0'){
-					tmpstr[offsetretarray+i-indexb-17]=' ';
-				}
+					tmpstr[offsetretarray+i-indexb[readmapindexselect]-17]=' ';
+				}}
 				i=i+1;
 				if(i>=maxmemreturnsize+17){
 					break;
@@ -467,22 +545,23 @@ char *readmmap(int readmapindexselect,int gfifghdughfid) {
 			}
 		}else{
 			while(i<index){
-				tmpstr[i-indexb-17]=map[readmapindexselect][i];
+				if((i)<bufferlength+100)
+				tmpstr[i-indexb[readmapindexselect]-17]=map[readmapindexselect][i];
 				i=i+1;
 				if(i>=maxmemreturnsize+17){
 					break;
 				}
 			}
 		}
+		indexb[readmapindexselect]=indexb[readmapindexselect]+i-indexb[readmapindexselect]-17;
+		int vca=indexb[readmapindexselect]/1000000;
+		int vcb=(indexb[readmapindexselect]-vca*1000000)/100000;
+		int vcc=(indexb[readmapindexselect]-vca*1000000-vcb*100000)/10000;
+		int vcd=(indexb[readmapindexselect]-vca*1000000-vcb*100000-vcc*10000)/1000;
+		int vce=(indexb[readmapindexselect]-vca*1000000-vcb*100000-vcc*10000-vcd*1000)/100;
+		int vcf=(indexb[readmapindexselect]-vca*1000000-vcb*100000-vcc*10000-vcd*1000-vce*100)/10;
+		int vcg=(indexb[readmapindexselect]-vca*1000000-vcb*100000-vcc*10000-vcd*1000-vce*100-vcf*10);
 		map[readmapindexselect][shmsize-41]='A';
-		indexb=indexb+i-indexb-17;
-		int vca=indexb/1000000;
-		int vcb=(indexb-vca*1000000)/100000;
-		int vcc=(indexb-vca*1000000-vcb*100000)/10000;
-		int vcd=(indexb-vca*1000000-vcb*100000-vcc*10000)/1000;
-		int vce=(indexb-vca*1000000-vcb*100000-vcc*10000-vcd*1000)/100;
-		int vcf=(indexb-vca*1000000-vcb*100000-vcc*10000-vcd*1000-vce*100)/10;
-		int vcg=(indexb-vca*1000000-vcb*100000-vcc*10000-vcd*1000-vce*100-vcf*10);
 		map[readmapindexselect][8]=vca+'0';
 		map[readmapindexselect][9]=vcb+'0';
 		map[readmapindexselect][10]=vcc+'0';
@@ -494,6 +573,8 @@ char *readmmap(int readmapindexselect,int gfifghdughfid) {
 		return tmpstr;
 		}
 	}else{
+		while(map[readmapindexselect][shmsize-42]=='A'){
+		}
 		char stra[maxmemreturnsize+100]="";
 		char *tmpstr;
 		tmpstr=stra;
@@ -509,18 +590,14 @@ char *readmmap(int readmapindexselect,int gfifghdughfid) {
 		datapos[5]=map[readmapindexselect][5];
 		datapos[6]=map[readmapindexselect][6];
 		index=atoi(datapos);
-		char *dataposb;
-		dataposb=strab;
 		char *dataposbc;
 		dataposbc=strab;
-		int indexc=0;
 		sprintf(dataposbc,"%c%c",map[readmapindexselect][15],map[readmapindexselect][16]);
-		indexc=atoi(dataposbc);
-		int i=indexb+17;
-		if(indexb==index-17){
+		int i=indexb[readmapindexselect]+17;
+		if(indexb[readmapindexselect]==index-17){
 			return "";
 		}else{
-		if(indexb==index){
+		if(indexb[readmapindexselect]==index){
 		if(index==0){
 			return "";
 		}
@@ -528,23 +605,27 @@ char *readmmap(int readmapindexselect,int gfifghdughfid) {
 		if(i>=index){
 			int offsetretarray=0;
 			while(i<bufferlength+17){
-				tmpstr[i-indexb-17]=map[readmapindexselect][i];
+				if((i)<bufferlength+100)
+				tmpstr[i-indexb[readmapindexselect]-17]=map[readmapindexselect][i];
+				if((i)<bufferlength+100){
 				if(map[readmapindexselect][i]=='\0'){
-					tmpstr[i-indexb-17]=' ';
-				}
+					tmpstr[i-indexb[readmapindexselect]-17]=' ';
+				}}
 				i=i+1;
 				if(i>=maxmemreturnsize+17){
 					break;
 				}
 			}
-			offsetretarray=i-indexb-17;
-			indexb=0;
-			i=indexb+17;
+			offsetretarray=i-indexb[readmapindexselect]-17;
+			indexb[readmapindexselect]=0;
+			i=indexb[readmapindexselect]+17;
 			while(i<index){
-				tmpstr[offsetretarray+i-indexb-17]=map[readmapindexselect][i];
+				if((i)<bufferlength+100)
+				tmpstr[offsetretarray+i-indexb[readmapindexselect]-17]=map[readmapindexselect][i];
+				if((i)<bufferlength+100){
 				if(map[readmapindexselect][i]=='\0'){
-					tmpstr[offsetretarray+i-indexb-17]=' ';
-				}
+					tmpstr[offsetretarray+i-indexb[readmapindexselect]-17]=' ';
+				}}
 				i=i+1;
 				if(i>=maxmemreturnsize+17){
 					break;
@@ -552,14 +633,15 @@ char *readmmap(int readmapindexselect,int gfifghdughfid) {
 			}
 		}else{
 			while(i<index){
-				tmpstr[i-indexb-17]=map[readmapindexselect][i];
+				if((i)<bufferlength+100)
+				tmpstr[i-indexb[readmapindexselect]-17]=map[readmapindexselect][i];
 				i=i+1;
 				if(i>=maxmemreturnsize+17){
 					break;
 				}
 			}
 		}
-		indexb=indexb+i-indexb-17;
+		indexb[readmapindexselect]=indexb[readmapindexselect]+i-indexb[readmapindexselect]-17;
 		return tmpstr;
 		}
 	}

@@ -11,6 +11,7 @@ def procdemo():
 			print a
 			quit()
 mapa=fastmmap.connectmmap("None","testshm")
+print fastmmap.listmaps("python")
 print "Tests:"
 fastmmap.write(mapa,"test 1")
 pdemo=Process(target=procdemo, args=())
