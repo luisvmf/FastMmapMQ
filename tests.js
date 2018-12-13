@@ -1,6 +1,6 @@
 var mmap=require("./fastmmapmq");
-var id=mmap.ConnectMmapSync("None","map1");
-var idh=mmap.ConnectMmapSync("None","test");
+var id=mmap.CreateMmapSync("map1","rwx------");
+var idh=mmap.CreateMmapSync("test","rwx------");
 var idb=mmap.ConnectMmapSync("node","map1");
 console.log(mmap.ListSync("node"));
 mmap.WriteSync(id,"aaab");
@@ -17,12 +17,16 @@ mmap.WriteSync(id,"aaac");
 mmap.ReadAsync(idb,0,function(data){
 	console.log(data);
 });
-mmap.ConnectMmapAsync("None","map2",function(data){
-	mmap.ConnectMmapAsync("node","map2",function(datab){
-		mmap.WriteSync(data,"test");
-		console.log(mmap.ReadSync(datab,0));
+mmap.CreateMmapAsync("map2","rwx------",function(idc){
+	mmap.ConnectMmapAsync("node","map2",function(idd){
+		mmap.WriteSync(idc,"test");
+		console.log(mmap.ReadSync(idd,0));
 	});
 });
 mmap.ListAsync("node",function(data){
 	console.log(data);
 });
+mmap.WriteSharedStringSync(id,"String Sync");
+console.log(mmap.GetSharedStringSync(idb));
+console.log(mmap.GetSharedStringSync(idb));
+console.log(mmap.GetSharedStringSync(idb));
