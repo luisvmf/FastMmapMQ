@@ -8,8 +8,8 @@ console.log(mmap.ReadSync(idb,0));
 mmap.WriteSync(id,"aaab");
 console.log(mmap.ReadSync(idb,0));
 
-mmap.WriteAsync(id,"aaab");
-mmap.WriteAsync(id,"aaab");
+mmap.WriteAsync(id,"aaab",function(data){});
+mmap.WriteAsync(id,"aaab",function(data){});
 mmap.WriteSync(id,"aaab");
 console.log(mmap.ReadSync(idb,0));
 
@@ -30,3 +30,9 @@ mmap.WriteSharedStringSync(id,"String Sync");
 console.log(mmap.GetSharedStringSync(idb));
 console.log(mmap.GetSharedStringSync(idb));
 console.log(mmap.GetSharedStringSync(idb));
+mmap.WriteSharedStringAsync(id,"String Async",function(data){
+	console.log(mmap.GetSharedStringSync(idb));
+	mmap.GetSharedStringAsync(idb,function(data){
+		console.log(data);
+	});
+});

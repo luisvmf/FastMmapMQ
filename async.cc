@@ -14,7 +14,6 @@
 #include <time.h>
 #include <sys/time.h>
 //Copyright (c) 2018 Luís Victor Muller Fabris. Apache License.
-//TODO: Add functions GetSharedStringAsync and WriteSharedStringAsync.
 //TODO: Implement a queue in WriteSync and WriteAsync in case of temporary fail instead of just returning -1.
 //---------------------------------------------------------
 //---------------------------------------------------------
@@ -790,6 +789,7 @@ class AsyncSendWorker : public AsyncWorker {
 			Local<Value> argv[] = {
 				jsArr
 			};
+			callback->Call(1, argv);
 		  }
 	private:
 		int nodesendretval=0;
@@ -840,6 +840,78 @@ class AsyncListWorker : public AsyncWorker {
 	private:
 		char *nodereadretval;
 		std::string nodeinternalstring="";
+};
+class AsyncwritestringWorker : public AsyncWorker {
+	public:
+		 AsyncwritestringWorker(Callback *callback, int va, std::string internalstringb, int lengthb)
+			:AsyncWorker(callback),valinputnodesend(va),nodesentstring(internalstringb),nodelengthb(lengthb) {}
+		 ~AsyncwritestringWorker() {}
+		  void Execute () {
+				int vanode=valinputnodesend;
+				int readmapindexselect=vanode;
+				char stra[sharedstringsize+5]="";
+				char *tmpstring="";
+				tmpstring=stra;
+				tmpstring=nodesentstring.c_str();
+				int i=memmappedarraysize;
+				while(i<memmappedarraysize+sharedstringsize){
+					map[readmapindexselect][i]=tmpstring[i-memmappedarraysize];
+					i=i+1;
+					if(tmpstring[i-memmappedarraysize-1]=='\0'){
+						break;
+					}
+				}
+				map[readmapindexselect][i]='\0';
+				nodesendretval=0;
+		  }
+		  void HandleOKCallback () {
+			Nan::HandleScope scope;
+			v8::Local<v8::Integer> jsArr = Nan::New(nodesendretval);
+			Local<Value> argv[] = {
+				jsArr
+			};
+			callback->Call(1, argv);
+		  }
+	private:
+		int nodesendretval=0;
+		int valinputnodesend;
+		std::string nodesentstring="";
+		int nodelengthb;
+};
+class AsyncreadstringWorker : public AsyncWorker {
+	public:
+		 AsyncreadstringWorker(Callback *callback, int va)
+			:AsyncWorker(callback),valinputnodereada(va) {}
+		 ~AsyncreadstringWorker() {}
+		  void Execute () {
+			int vanode=valinputnodereada;
+			int readmapindexselect=vanode;
+			char stra[sharedstringsize+5]="";
+			char *tmpstring="";
+			tmpstring=stra;
+			int i=memmappedarraysize;
+			while(i<memmappedarraysize+sharedstringsize){
+				tmpstring[i-memmappedarraysize]=map[readmapindexselect][i];
+				if(map[readmapindexselect][i]=='\0'){
+					break;
+				}
+				i=i+1;
+			}
+			nodereadretval=tmpstring;
+		  }
+		  void HandleOKCallback () {
+			Nan::HandleScope scope;
+			v8::Local<v8::String> jsArr = Nan::New(nodereadretval).ToLocalChecked();
+			int j=0;
+			Local<Value> argv[] = {
+				 jsArr
+			};
+			callback->Call(1, argv);
+		  }
+	private:
+		int valinputnodereada;
+		int valinputnodereadb;
+		char *nodereadretval;
 };
 void consync(const FunctionCallbackInfo<Value>& info) {
 	v8::String::Utf8Value param1(info[0]->ToString());
@@ -957,7 +1029,7 @@ NAN_METHOD(write) {
     std::string internalstringb = std::string(*param2);  
 	Nan::Utf8String intdatastrb(info[1]);
 	int lengthb = intdatastrb.length();
-	Callback *callback = new Callback();
+	Callback *callback = new Callback(info[2].As<Function>());
 	AsyncQueueWorker(new AsyncSendWorker(callback,va,internalstringb,lengthb));
 }
 NAN_METHOD(read) {
@@ -965,6 +1037,21 @@ NAN_METHOD(read) {
 	int vb=info[1]->NumberValue();
 	Callback *callback = new Callback(info[2].As<Function>());
 	AsyncQueueWorker(new AsyncreadWorker(callback,va,vb));
+}
+NAN_METHOD(readstringasync) {
+	int va=info[0]->NumberValue();
+	Callback *callback = new Callback(info[1].As<Function>());
+	AsyncQueueWorker(new AsyncreadstringWorker(callback,va));
+}
+
+NAN_METHOD(writestringasync) {
+	int va=info[0]->NumberValue();
+    v8::String::Utf8Value param2(info[1]->ToString());
+    std::string internalstringb = std::string(*param2);  
+	Nan::Utf8String intdatastrb(info[1]);
+	int lengthb = intdatastrb.length();
+	Callback *callback = new Callback(info[2].As<Function>());
+	AsyncQueueWorker(new AsyncwritestringWorker(callback,va,internalstringb,lengthb));
 }
 NAN_METHOD(listmmapasync) {
     v8::String::Utf8Value param1(info[0]->ToString());
@@ -1001,6 +1088,10 @@ NAN_MODULE_INIT(InitAll) {
 		Nan::GetFunction(Nan::New<FunctionTemplate>(write)).ToLocalChecked());
 	Nan::Set(target, Nan::New("ReadAsync").ToLocalChecked(),
 		Nan::GetFunction(Nan::New<FunctionTemplate>(read)).ToLocalChecked());
+	Nan::Set(target, Nan::New("WriteSharedStringAsync").ToLocalChecked(),
+		Nan::GetFunction(Nan::New<FunctionTemplate>(writestringasync)).ToLocalChecked());
+	Nan::Set(target, Nan::New("GetSharedStringAsync").ToLocalChecked(),
+		Nan::GetFunction(Nan::New<FunctionTemplate>(readstringasync)).ToLocalChecked());
 	Nan::Set(target, Nan::New("ConnectMmapAsync").ToLocalChecked(),
 		Nan::GetFunction(Nan::New<FunctionTemplate>(connectmmap)).ToLocalChecked());
 	Nan::Set(target, Nan::New("CreateMmapAsync").ToLocalChecked(),

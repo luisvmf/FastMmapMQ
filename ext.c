@@ -515,7 +515,7 @@ static PyObject* readmessage(PyObject* self,  PyObject *args) {
 		int index=0;
 		jjold=0;
 		if(map[readmapindexselect][shmsize-41]=='A'){
-			return Py_BuildValue("is", -1,"");
+			return Py_BuildValue("s", "");
 		}
 		map[readmapindexselect][shmsize-41]='A';
 		while(jjold<=6){
@@ -538,11 +538,11 @@ static PyObject* readmessage(PyObject* self,  PyObject *args) {
 		sprintf(dataposbc,"%c%c",map[readmapindexselect][15],map[readmapindexselect][16]);
 		int i=indexb[readmapindexselect]+17;
 		if(indexb[readmapindexselect]==index-17){
-			return Py_BuildValue("is",0,"");
+			return Py_BuildValue("s","");
 		}else{
 		if(indexb[readmapindexselect]==index){
 			if(index==0){
-				return Py_BuildValue("is",0,"");
+				return Py_BuildValue("s","");
 			}
 		}
 		if(i>=index){
@@ -593,7 +593,7 @@ static PyObject* readmessage(PyObject* self,  PyObject *args) {
 		int vcf=(indexb[readmapindexselect]-vca*1000000-vcb*100000-vcc*10000-vcd*1000-vce*100)/10;
 		int vcg=(indexb[readmapindexselect]-vca*1000000-vcb*100000-vcc*10000-vcd*1000-vce*100-vcf*10);
 		if(map[readmapindexselect][shmsize-41]=='A'){
-			return Py_BuildValue("is", -1,"");
+			return Py_BuildValue("s", "");
 		}
 		map[readmapindexselect][shmsize-41]='A';
 		map[readmapindexselect][8]=vca+'0';
@@ -604,11 +604,11 @@ static PyObject* readmessage(PyObject* self,  PyObject *args) {
 		map[readmapindexselect][13]=vcf+'0';
 		map[readmapindexselect][14]=vcg+'0';
 		map[readmapindexselect][shmsize-41]='\0';
-		return Py_BuildValue("is",0,tmpstr );
+		return Py_BuildValue("s",tmpstr );
 		}
 	}else{
 		if(map[readmapindexselect][shmsize-41]=='A'){
-			return Py_BuildValue("is", -1,"");
+			return Py_BuildValue("s", "");
 		}
 		map[readmapindexselect][shmsize-41]='A';
 		char stra[maxmemreturnsize+100]="";
@@ -631,12 +631,12 @@ static PyObject* readmessage(PyObject* self,  PyObject *args) {
 		int i=indexb[readmapindexselect]+17;
 		if(indexb[readmapindexselect]==index-17){
 			map[readmapindexselect][shmsize-41]='\0';
-			return Py_BuildValue("is",0,"");
+			return Py_BuildValue("s","");
 		}else{
 		if(indexb[readmapindexselect]==index){
 			if(index==0){
 				map[readmapindexselect][shmsize-41]='\0';
-				return Py_BuildValue("is",0,"");
+				return Py_BuildValue("s","");
 			}
 		}
 		if(i>=index){
@@ -679,7 +679,7 @@ static PyObject* readmessage(PyObject* self,  PyObject *args) {
 			}
 		}
 		indexb[readmapindexselect]=indexb[readmapindexselect]+i-indexb[readmapindexselect]-17;
-		return Py_BuildValue("is",0,tmpstr );
+		return Py_BuildValue("s",tmpstr );
 		}
 	}
 }
