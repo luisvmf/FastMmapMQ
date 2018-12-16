@@ -14,7 +14,6 @@
 #include <time.h>
 #include <sys/time.h>
 //Copyright (c) 2018 Luís Victor Muller Fabris. Apache License.
-//TODO: Implement a queue in WriteSync and WriteAsync in case of temporary fail instead of just returning -1.
 //---------------------------------------------------------
 //---------------------------------------------------------
 //Constants. This constants should be the same for all programs using a mmap. Diferent constants for the same mmap can result in undefined behavior.
@@ -351,11 +350,13 @@ int startmemmap(int create,char *programlocation,char *id, mode_t permission){
 		dataposb=strab;
 		indexb[currentcreatedmapindex-1]=0;
 		if(map[currentcreatedmapindex-1][7]!='\x17'){
+		if(map[currentcreatedmapindex-1][7]!='\x21'){
 			jjold=0;
 			while(jjold<=16){
 				map[currentcreatedmapindex-1][jjold]='0';
 				jjold=jjold+1;
 			}
+		}
 		}
 		map[currentcreatedmapindex-1][7]='\x17';
 		jjold=0;
@@ -400,12 +401,16 @@ int writeutils(int writemapindexselect,  char *s) {
 	char *dataposold;
 	datapos=stra;
 	dataposold=straold;
-	if(map[writemapindexselect][shmsize-42]=='A'){
-		return -1;
+	if(writemapindexselect<0){
+		perror("Invalid mmap id on write");
+		exit(EXIT_FAILURE);
 	}
-	if(map[writemapindexselect][shmsize-41]=='A'){
-		return -1;
+	if(writemapindexselect>currentcreatedmapindex){
+		perror("Invalid mmap id on write");
+		exit(EXIT_FAILURE);
 	}
+	while(map[writemapindexselect][shmsize-42]=='A'){}
+	while(map[writemapindexselect][shmsize-41]=='A'){}
 	map[writemapindexselect][shmsize-42]='A';
 	jjold=0;
 	while(jjold<=6){
@@ -424,6 +429,7 @@ int writeutils(int writemapindexselect,  char *s) {
 	index=atoi(datapos);
 	indexreadold=atoi(dataposold);
 	int writeupto=index+lenscalc+1;
+	if(map[writemapindexselect][7]=='\x17'){
 	if(index!=0){
 		writeupto=writeupto-17;
 		if(writeupto>bufferlength-1){
@@ -436,6 +442,7 @@ int writeutils(int writemapindexselect,  char *s) {
 				return -1;
 			}
 		}
+	}
 	}
 	index=index+1;
 	if(index==1){
@@ -512,6 +519,14 @@ int writeutils(int writemapindexselect,  char *s) {
 }
 char *readutils(int readmapindexselect,int gfifghdughfid) {
 	int jjold=0;
+	if(readmapindexselect<0){
+		perror("Invalid mmap id on read");
+		exit(EXIT_FAILURE);
+	}
+	if(readmapindexselect>currentcreatedmapindex){
+		perror("Invalid mmap id on read");
+		exit(EXIT_FAILURE);
+	}
 	if(gfifghdughfid==0){
 		char stra[maxmemreturnsize+100]="";
 		char *tmpstr;
@@ -614,6 +629,7 @@ char *readutils(int readmapindexselect,int gfifghdughfid) {
 		return tmpstr;
 		}
 	}else{
+		map[readmapindexselect][7]='\x21';
 		if(map[readmapindexselect][shmsize-41]=='A'){
 			return "";
 		}
