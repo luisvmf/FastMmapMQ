@@ -1,5 +1,6 @@
 # FastMmapMQ
-Fast Message queue Python module written in C using a memory mapped file in /dev/shm
+Fast Message queue module for Python, nodejs and c written in C using a memory mapped file in /dev/shm.
+Check tests.py, tests.js and test.c for API.
 
 ./build-python.sh
 
