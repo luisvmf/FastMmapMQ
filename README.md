@@ -45,6 +45,7 @@ node tests.js
 	
 	
 benchmarks
+
 	Testing fastmmapmq:::...writing 20000000 messages:
 	Time:10.7677519321s, with 31575 busy writes, 20031575 total write calls.
 
