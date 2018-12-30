@@ -96,24 +96,34 @@ int isinshm(char *fdlink){
 	struct stat sb;
 	char *linkname;
 	ssize_t r;
-	char *str="/dev/shm";
-	if (lstat(fdlink, &sb) == -1) {
-		perror("lstat");
-		exit(EXIT_FAILURE);
+	char *str=shmfolder;
+	int retryisinshm=10;
+	int continueisinshm=0;
+	while(retryisinshm>0){
+		continueisinshm=0;
+		if (lstat(fdlink, &sb) == -1) {
+			continueisinshm=-1;
+		}
+		linkname = malloc(sb.st_size + 1);
+		if (linkname == NULL) {
+			continueisinshm=-1;
+		}
+		r = readlink(fdlink, linkname, sb.st_size + 1);
+		if (r < 0) {
+			continueisinshm=-1;
+		}
+		if (r > sb.st_size) {
+			continueisinshm=-1;
+		}
+		retryisinshm=retryisinshm-1;
+		if(continueisinshm==0){
+			break;
+		}else{
+			sleep(0.01);
+		}
 	}
-	linkname = malloc(sb.st_size + 1);
-	if (linkname == NULL) {
-		fprintf(stderr, "Fail in isinshm\n");
-		exit(EXIT_FAILURE);
-	}
-	r = readlink(fdlink, linkname, sb.st_size + 1);
-	if (r < 0) {
-		perror("lstat");
-		exit(EXIT_FAILURE);
-	}
-	if (r > sb.st_size) {
-		fprintf(stderr, "Fail in isinshm\n");
-		exit(EXIT_FAILURE);
+	if(continueisinshm==-1){
+		return 0;
 	}
 	linkname[sb.st_size] = '\0';
 	if((strncmp(linkname, str,strlen(str)))==0){
