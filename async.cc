@@ -345,6 +345,10 @@ void creatememmap(void){
 	}
 }
 int startmemmap(int create,char *programlocation,char *id, mode_t permission){
+	if(currentcreatedmapindex>bufferlength-5){
+		perror("Maximum mmap number exceeded");
+		exit(EXIT_FAILURE);
+	}
 	int thismapindex=-1;
 	if(create==1){
 		thismapindex=openfd_create(programlocation,id,permission);
@@ -880,6 +884,16 @@ class AsyncwritestringWorker : public AsyncWorker {
 				tmpstring=stra;
 				tmpstring=nodesentstring.c_str();
 				int i=memmappedarraysize;
+				if(readmapindexselect<0){
+					perror("Invalid mmap id on write");
+					exit(EXIT_FAILURE);
+				}
+				if(readmapindexselect>currentcreatedmapindex){
+					perror("Invalid mmap id on write");
+					exit(EXIT_FAILURE);
+				}
+				while(map[readmapindexselect][shmsize-42]=='A'){}
+				map[readmapindexselect][shmsize-42]='A';
 				while(i<memmappedarraysize+sharedstringsize){
 					map[readmapindexselect][i]=tmpstring[i-memmappedarraysize];
 					i=i+1;
@@ -889,6 +903,7 @@ class AsyncwritestringWorker : public AsyncWorker {
 				}
 				map[readmapindexselect][i]='\0';
 				nodesendretval=0;
+				map[readmapindexselect][shmsize-42]='\0';
 		  }
 		  void HandleOKCallback () {
 			Nan::HandleScope scope;
@@ -916,6 +931,16 @@ class AsyncreadstringWorker : public AsyncWorker {
 			char *tmpstring="";
 			tmpstring=stra;
 			int i=memmappedarraysize;
+			if(readmapindexselect<0){
+				perror("Invalid mmap id on read");
+				exit(EXIT_FAILURE);
+			}
+			if(readmapindexselect>currentcreatedmapindex){
+				perror("Invalid mmap id on read");
+				exit(EXIT_FAILURE);
+			}
+			while(map[readmapindexselect][shmsize-42]=='A'){}
+			map[readmapindexselect][shmsize-42]='A';
 			while(i<memmappedarraysize+sharedstringsize){
 				tmpstring[i-memmappedarraysize]=map[readmapindexselect][i];
 				if(map[readmapindexselect][i]=='\0'){
@@ -924,6 +949,7 @@ class AsyncreadstringWorker : public AsyncWorker {
 				i=i+1;
 			}
 			nodereadretval=tmpstring;
+			map[readmapindexselect][shmsize-42]='\0';
 		  }
 		  void HandleOKCallback () {
 			Nan::HandleScope scope;
@@ -988,6 +1014,16 @@ void writestringsync(const FunctionCallbackInfo<Value>& info) {
 	tmpstring=stra;
 	tmpstring=internalstringbnode.c_str();
 	int i=memmappedarraysize;
+	if(readmapindexselect<0){
+		perror("Invalid mmap id on write");
+		exit(EXIT_FAILURE);
+	}
+	if(readmapindexselect>currentcreatedmapindex){
+		perror("Invalid mmap id on write");
+		exit(EXIT_FAILURE);
+	}
+	while(map[readmapindexselect][shmsize-42]=='A'){}
+	map[readmapindexselect][shmsize-42]='A';
 	while(i<memmappedarraysize+sharedstringsize){
 		map[readmapindexselect][i]=tmpstring[i-memmappedarraysize];
 		i=i+1;
@@ -996,6 +1032,7 @@ void writestringsync(const FunctionCallbackInfo<Value>& info) {
 		}
 	}
 	map[readmapindexselect][i]='\0';
+	map[readmapindexselect][shmsize-42]='\0';
 	info.GetReturnValue().Set(0);
 }
 void getstringsync(const FunctionCallbackInfo<Value>& info) {
@@ -1005,6 +1042,16 @@ void getstringsync(const FunctionCallbackInfo<Value>& info) {
 	char *tmpstring="";
 	tmpstring=stra;
 	int i=memmappedarraysize;
+	if(readmapindexselect<0){
+		perror("Invalid mmap id on read");
+		exit(EXIT_FAILURE);
+	}
+	if(readmapindexselect>currentcreatedmapindex){
+		perror("Invalid mmap id on read");
+		exit(EXIT_FAILURE);
+	}
+	while(map[readmapindexselect][shmsize-42]=='A'){}
+	map[readmapindexselect][shmsize-42]='A';
 	while(i<memmappedarraysize+sharedstringsize){
 		tmpstring[i-memmappedarraysize]=map[readmapindexselect][i];
 		if(map[readmapindexselect][i]=='\0'){
@@ -1012,6 +1059,7 @@ void getstringsync(const FunctionCallbackInfo<Value>& info) {
 		}
 		i=i+1;
 	}
+	map[readmapindexselect][shmsize-42]='\0';
 	info.GetReturnValue().Set(Nan::New(tmpstring).ToLocalChecked());
 }
 void readsync(const FunctionCallbackInfo<Value>& info) {

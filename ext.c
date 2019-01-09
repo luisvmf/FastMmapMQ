@@ -328,6 +328,10 @@ void creatememmap(void){
 	}
 }
 int startmemmap(int create,char *programlocation,char *id, mode_t permission){
+	if(currentcreatedmapindex>bufferlength-5){
+		perror("Maximum mmap number exceeded");
+		exit(EXIT_FAILURE);
+	}
 	int thismapindex=-1;
 	if(create==1){
 		thismapindex=openfd_create(programlocation,id,permission);
@@ -729,6 +733,16 @@ static PyObject* pygetsharedstring(PyObject* self,  PyObject *args) {
 	if (!PyArg_ParseTuple(args, "i",&readmapindexselect)) {
 		return NULL;
 	}
+	if(readmapindexselect<0){
+		perror("Invalid mmap id on read");
+		exit(EXIT_FAILURE);
+	}
+	if(readmapindexselect>currentcreatedmapindex){
+		perror("Invalid mmap id on read");
+		exit(EXIT_FAILURE);
+	}
+	while(map[readmapindexselect][shmsize-42]=='A'){}
+	map[readmapindexselect][shmsize-42]='A';
 	int i=memmappedarraysize;
 	while(i<memmappedarraysize+sharedstringsize){
 		tmpstring[i-memmappedarraysize]=map[readmapindexselect][i];
@@ -737,6 +751,7 @@ static PyObject* pygetsharedstring(PyObject* self,  PyObject *args) {
 		}
 		i=i+1;
 	}
+	map[readmapindexselect][shmsize-42]='\0';
 	return Py_BuildValue("s", tmpstring);
 }
 static PyObject* pywritesharedstring(PyObject* self,  PyObject *args) {
@@ -747,6 +762,16 @@ static PyObject* pywritesharedstring(PyObject* self,  PyObject *args) {
 	if (!PyArg_ParseTuple(args, "is",&readmapindexselect,&tmpstring)) {
 		return NULL;
 	}
+	if(readmapindexselect<0){
+		perror("Invalid mmap id on write");
+		exit(EXIT_FAILURE);
+	}
+	if(readmapindexselect>currentcreatedmapindex){
+		perror("Invalid mmap id on write");
+		exit(EXIT_FAILURE);
+	}
+	while(map[readmapindexselect][shmsize-42]=='A'){}
+	map[readmapindexselect][shmsize-42]='A';
 	int i=memmappedarraysize;
 	while(i<memmappedarraysize+sharedstringsize){
 		map[readmapindexselect][i]=tmpstring[i-memmappedarraysize];
@@ -756,6 +781,7 @@ static PyObject* pywritesharedstring(PyObject* self,  PyObject *args) {
 		}
 	}
 	map[readmapindexselect][i]='\0';
+	map[readmapindexselect][shmsize-42]='\0';
 	return Py_BuildValue("i", 0);
 }
 static PyObject* pyinitmmap_create(PyObject* self,  PyObject *args) {

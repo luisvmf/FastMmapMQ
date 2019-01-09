@@ -327,6 +327,10 @@ void creatememmap(void){
 	}
 }
 int startmemmap(int create,char *programlocation,char *id, mode_t permission){
+	if(currentcreatedmapindex>bufferlength-5){
+		perror("Maximum mmap number exceeded");
+		exit(EXIT_FAILURE);
+	}
 	int thismapindex=-1;
 	if(create==1){
 		thismapindex=openfd_create(programlocation,id,permission);
