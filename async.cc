@@ -843,7 +843,7 @@ class AsyncListWorker : public AsyncWorker {
 					ilist=ilist+1;
 				}
 				listmmaps(s,retval,b);
-				char templist[900+10];
+				char templist[(900+10)*50];
 				char *retvalstr;
 				retvalstr=templist;
 				ilist=0;
@@ -1082,7 +1082,7 @@ void listsync(const FunctionCallbackInfo<Value>& info) {
 		ilist=ilist+1;
 	}
 	listmmaps(s,retval,b);
-	char templist[900+10];
+	char templist[(900+10)*50];
 	char *retvalstr;
 	retvalstr=templist;
 	ilist=0;

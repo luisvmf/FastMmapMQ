@@ -728,7 +728,7 @@ char *listmmaps(char *s){
 		ilist=ilist+1;
 	}
 	listmmapsinternal(s,retval,b);
-	char templist[900+10];
+	char templist[(900+10)*50];
 	char *retvalstr;
 	retvalstr=templist;
 	ilist=0;
