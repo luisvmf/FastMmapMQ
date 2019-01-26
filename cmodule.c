@@ -179,7 +179,7 @@ int openfd_connect(char *programlocation,char *id,mode_t permission){
 										//printf("found pid:%s, program: %s, file descriptor:%s\n",(dir->d_name),cmdlinefduric,(dirb->d_name));
 										foundfile=1;
 										char* location;
-										location=malloc(strlen(shmpath)+strlen(id)+1);
+										location=malloc(strlen(shmpath)+strlen(id)+1+strlen(cmdlinefduric));
 										strcpy(location, cmdlinefduric);
 										fd[currentcreatedmapindex] = open(location, O_RDWR);
 										if (fd[currentcreatedmapindex] == -1) {
