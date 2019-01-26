@@ -835,7 +835,7 @@ class AsyncListWorker : public AsyncWorker {
 		  void Execute () {
 				char *s=nodeinternalstring.c_str(); //Program
 				int b=900; //Maximum number of mmaps to return on listmaps("string").
-				char *retval[b];
+				char *retval[b+10];
 				int ilist=0;
 				while(ilist<=b){
 					retval[ilist]=malloc(300);
@@ -843,7 +843,7 @@ class AsyncListWorker : public AsyncWorker {
 					ilist=ilist+1;
 				}
 				listmmaps(s,retval,b);
-				char templist[900];
+				char templist[900+10];
 				char *retvalstr;
 				retvalstr=templist;
 				ilist=0;
@@ -1074,7 +1074,7 @@ void listsync(const FunctionCallbackInfo<Value>& info) {
 	v8::String::Utf8Value param1(info[0]->ToString());
 	std::string internalstring = std::string(*param1);
 	s=internalstring.c_str();
-	char *retval[b];
+	char *retval[b+10];
 	int ilist=0;
 	while(ilist<=b){
 		retval[ilist]=malloc(300);
@@ -1082,7 +1082,7 @@ void listsync(const FunctionCallbackInfo<Value>& info) {
 		ilist=ilist+1;
 	}
 	listmmaps(s,retval,b);
-	char templist[900];
+	char templist[900+10];
 	char *retvalstr;
 	retvalstr=templist;
 	ilist=0;

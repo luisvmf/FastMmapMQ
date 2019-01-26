@@ -804,7 +804,7 @@ static PyObject* pylistmap(PyObject* self,  PyObject *args) {
 	if (!PyArg_ParseTuple(args, "s",&s)) {
 		return NULL;
 	}
-	char *retval[b];
+	char *retval[b+10];
 	int ilist=0;
 	while(ilist<=b){
 		retval[ilist]=malloc(300);
@@ -812,7 +812,7 @@ static PyObject* pylistmap(PyObject* self,  PyObject *args) {
 		ilist=ilist+1;
 	}
 	listmmaps(s,retval,b);
-	char templist[900];
+	char templist[900+10];
 	char *retvalstr;
 	retvalstr=templist;
 	ilist=0;

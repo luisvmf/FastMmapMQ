@@ -720,7 +720,7 @@ int createmmap(char *b,char *s) {
 }
 char *listmmaps(char *s){
 	int b=900; //Maximum number of mmaps to return on listmaps("string").
-	char *retval[b];
+	char *retval[b+10];
 	int ilist=0;
 	while(ilist<=b){
 		retval[ilist]=malloc(300);
@@ -728,7 +728,7 @@ char *listmmaps(char *s){
 		ilist=ilist+1;
 	}
 	listmmapsinternal(s,retval,b);
-	char templist[900];
+	char templist[900+10];
 	char *retvalstr;
 	retvalstr=templist;
 	ilist=0;
