@@ -2,7 +2,6 @@ import fastmmap
 #help(fastmmap)
 mapa=fastmmap.createmmap("testshm","rwx------")
 mapb=fastmmap.connectmmap("python","testshm")
-print fastmmap.listmaps("python")
 while(True):
 	a=fastmmap.write(mapa,"test 1")
 	if(a==0):

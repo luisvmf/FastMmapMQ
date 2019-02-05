@@ -14,11 +14,11 @@
 //---------------------------------------------------------
 //---------------------------------------------------------
 //Constants. This constants should be the same for all programs using a mmap. Diferent constants for the same mmap can result in undefined behavior.
-#define shmfolder "/dev/shm"
 #define shmpath "/dev/shm/luisvmfcomfastmmapmqshm-"
 #define bufferlength  (999999) //Number of characters in buffer. Maximum value is 999999.
 #define maxmemreturnsize  (999999) //Maximum number of characters returned by read function in one run. Maximum value is 999999.
 #define sharedstringsize  (999999) //Maximum number of characters in shared string. No maximum.
+#define maxfdnum 80
 //---------------------------------------------------------
 //---------------------------------------------------------
 //---------------------------------------------------------
@@ -29,35 +29,6 @@ int fd[bufferlength];
 volatile char *map[bufferlength+200];
 int currentcreatedmapindex=0;
 int indexb[bufferlength]={0};
-int searchb(char *fname, char *str) {
-	FILE *fp;
-	int line_num = 1;
-	int find_result = 0;
-	char temp[45+35];
-	if((fp=fopen(fname,"r"))==NULL){
-		return 0;
-	}
-	lseek((intptr_t)fp, shmsize-45, SEEK_SET);
-	while(fgets(temp,45, fp)!=NULL){
-		int isearch=0;
-		while(isearch<45){
-			if(temp[isearch]=='\0'){
-				temp[isearch]='\x17';
-			}
-			isearch=isearch+1;
-		}
-		temp[45+34]='\0';
-		if((strstr(temp, str))!=NULL){
-			return 1;
-			find_result++;
-		}
-		line_num++;
-	}
-	if(fp) {
-		fclose(fp);
-	}
-   	return 0;
-}
 int search(char *fname, char *str) {
 	FILE *fp;
 	int line_num = 1;
@@ -82,6 +53,9 @@ int search(char *fname, char *str) {
 			isearch=isearch+1;
 		}
 		if((strstr(temp, str))!=NULL){
+			if(fp) {
+				fclose(fp);
+			}
 			return 1;
 			find_result++;
 		}
@@ -92,11 +66,15 @@ int search(char *fname, char *str) {
 	}
    	return 0;
 }
-int isinshm(char *fdlink){
+int isinshm(char *fdlink,char *id){
 	struct stat sb;
 	char *linkname;
 	ssize_t r;
-	char *str=shmfolder;
+	char *str;
+	str=malloc(strlen(shmpath)+strlen(id)+3);
+	strcpy(str, shmpath);
+	strcat(str, id);
+	strcat(str, "-");
 	int retryisinshm=10;
 	int continueisinshm=0;
 	while(retryisinshm>0){
@@ -119,7 +97,7 @@ int isinshm(char *fdlink){
 		if(continueisinshm==0){
 			break;
 		}else{
-			sleep(0.01);
+			usleep(0.05*1000000);
 		}
 	}
 	if(continueisinshm==-1){
@@ -159,9 +137,14 @@ int openfd_connect(char *programlocation,char *id,mode_t permission){
 				struct dirent *dirb;
 				db=opendir(cmdlinefduri);
 				if(db){
+				int curfdnum=0;
 				while((dirb=readdir(db))!=NULL){
 				int tmpnumb = atoi(dirb->d_name);
 				if(tmpnumb==0&&(dirb->d_name)[0]!='0'){}else{
+						if(curfdnum>maxfdnum){
+							break;
+						}
+						curfdnum=curfdnum+1;
 						char *cmdlinefduric;
 						cmdlinefduric=malloc(strlen((dir->d_name))+strlen((dirb->d_name))+strlen("/proc//fd/")+1+5);
 						strcpy(cmdlinefduric, "/proc/");
@@ -171,13 +154,7 @@ int openfd_connect(char *programlocation,char *id,mode_t permission){
 						struct stat sb;
 						if(stat(cmdlinefduric, &sb)!=-1){
 							if(S_ISREG(sb.st_mode)){
-								if(isinshm(cmdlinefduric)){
-								if(searchb(cmdlinefduric,"luisvmffastmmapmq")){
-									//char *cmdlinefduric is the file uri in /proc for an unlinked fastmmapmq adress owened by program with cmdline containing char *programlocation!
-									//Lets check if this file contains char *id
-									if(searchb(cmdlinefduric,id)){
-										//We found the unlinked file we want!!! Now lets open an file descriptor to it!!!
-										//printf("found pid:%s, program: %s, file descriptor:%s\n",(dir->d_name),cmdlinefduric,(dirb->d_name));
+								if(isinshm(cmdlinefduric,id)){
 										foundfile=1;
 										char* location;
 										location=malloc(strlen(shmpath)+strlen(id)+1+strlen(cmdlinefduric));
@@ -186,9 +163,6 @@ int openfd_connect(char *programlocation,char *id,mode_t permission){
 										if (fd[currentcreatedmapindex] == -1) {
 											foundfile=0;
 										}
-
-									}
-								}
 							}
 						}
 						}
@@ -214,8 +188,10 @@ int openfd_create(char *programlocation,char *id,mode_t permission){
 		randomstring=strab;
 		sprintf(randomstring,"%i",(rand()));
 		char* location;
-		location=malloc(strlen(shmpath)+strlen(randomstring)+1);
+		location=malloc(strlen(shmpath)+strlen(randomstring)+strlen(id)+5);
 		strcpy(location, shmpath);
+		strcat(location, id);
+		strcat(location, "-");
 		strcat(location, randomstring);
 		fd[currentcreatedmapindex] = open(location, O_RDWR | O_CREAT, (mode_t) permission);
 		if (fd[currentcreatedmapindex] == -1) {
@@ -234,114 +210,47 @@ int initshm(void){
 	int lseekresult;
 	lseekresult = lseek(fd[currentcreatedmapindex-1], 2*shmsize+25+((sharedstringsize+3)*sizeof(char)), SEEK_SET);
 	if (lseekresult == -1) {
+		perror("lseek1");
 		close(fd[currentcreatedmapindex-1]);
 		return -1;
 	}
 	lseekresult = write(fd[currentcreatedmapindex-1], "", 1);
 	if (lseekresult != 1) {
+		perror("lseek2");
 		close(fd[currentcreatedmapindex-1]);
 		return -1;
 	}
 	return 0;
 }
-void listmmaps(char *programlocation,char *foundmaps[],int maxmapfindnum){
-			int foundmapcounter=0;
-			int foundfile=0;
-			DIR *d;
-			struct dirent *dir;
-			d=opendir("/proc/");
-			if(d){
-			while((dir=readdir(d))!=NULL){
-			if(foundfile==1){
-				break;
-			}
-			int tmpnum = atoi(dir->d_name);
-			if(tmpnum==0&&(dir->d_name)[0]!='0'){}else{
-				char *cmdlineuri;
-				cmdlineuri=malloc(strlen((dir->d_name))+strlen("/proc//cmdline")+1);
-				strcpy(cmdlineuri, "/proc/");
-				strcat(cmdlineuri, (dir->d_name));
-				strcat(cmdlineuri, "/cmdline");
-				if(search(cmdlineuri,programlocation)){
-				char *cmdlinefduri;
-				cmdlinefduri=malloc(strlen((dir->d_name))+strlen("/proc//fd/")+1);
-				strcpy(cmdlinefduri, "/proc/");
-				strcat(cmdlinefduri, (dir->d_name));
-				strcat(cmdlinefduri, "/fd/");
-				DIR *db;
-				struct dirent *dirb;
-				db=opendir(cmdlinefduri);
-				if(db){
-				while((dirb=readdir(db))!=NULL){
-				int tmpnumb = atoi(dirb->d_name);
-				if(tmpnumb==0&&(dirb->d_name)[0]!='0'){}else{
-						char *cmdlinefduric;
-						cmdlinefduric=malloc(strlen((dir->d_name))+strlen((dirb->d_name))+strlen("/proc//fd/")+1+5);
-						strcpy(cmdlinefduric, "/proc/");
-						strcat(cmdlinefduric, (dir->d_name));
-						strcat(cmdlinefduric, "/fd/");
-						strcat(cmdlinefduric, (dirb->d_name));
-						struct stat sb;
-						if(stat(cmdlinefduric, &sb)!=-1){
-							if(S_ISREG(sb.st_mode)){
-								if(isinshm(cmdlinefduric)){
-								if(searchb(cmdlinefduric,"luisvmffastmmapmq")){
-									//char *cmdlinefduric is the file uri in /proc for an unlinked fastmmapmq adress owened by program with cmdline containing char *programlocation!
-									//Lets check if this file contains char *id
-									int intsearchmapcounter=0;
-									int tempmmapfd=open(cmdlinefduric, O_RDONLY );
-									char *tempmmap;
-									tempmmap=mmap(0, shmsize, PROT_READ , MAP_SHARED, tempmmapfd, 0);
-									foundmaps[foundmapcounter]=malloc(180);
-									while(intsearchmapcounter<19){
-										if(maxmapfindnum==foundmapcounter){
-											foundfile=1;
-											break;
-										}
-										foundmaps[foundmapcounter][intsearchmapcounter]=tempmmap[shmsize-40+intsearchmapcounter];
-										intsearchmapcounter=intsearchmapcounter+1;
-										foundfile=1;
-									}
-									munmap(tempmmap,shmsize);
-									close(tempmmapfd);
-									foundmapcounter=foundmapcounter+1;
-								}
-							}
-						}
-						}
-				}
-				}
-				closedir(db);
-				}
-				}
-			}
-			}
-			closedir(d);
-			}
-}
-void creatememmap(void){
+int creatememmap(void){
 	map[currentcreatedmapindex-1] = mmap(0, shmsize+((sharedstringsize+3)*sizeof(char)), PROT_READ | PROT_WRITE, MAP_SHARED, fd[currentcreatedmapindex-1], 0);
 	if (map[currentcreatedmapindex-1] == MAP_FAILED) {
 		close(fd[currentcreatedmapindex-1]);
 		perror("Error on shared memory mmap");
-		exit(EXIT_FAILURE);
+		return -1;
 	}
+	return 0;
 }
 int startmemmap(int create,char *programlocation,char *id, mode_t permission){
 	if(currentcreatedmapindex>bufferlength-5){
 		perror("Maximum mmap number exceeded");
 		exit(EXIT_FAILURE);
 	}
+
 	int thismapindex=-1;
+	int openedshmstatus=1;
 	if(create==1){
 		thismapindex=openfd_create(programlocation,id,permission);
+		openedshmstatus=initshm();
 	}else{
 		thismapindex=openfd_connect(programlocation,id,permission);
+		openedshmstatus=0;
 	}
-	int openedshmstatus=initshm();
 	int jjold=0;
+	if(creatememmap()==-1){
+		return -1;
+	}
 	if(openedshmstatus==0){
-		creatememmap();
 		char strab[9]="";
 		char *dataposb;
 		dataposb=strab;
@@ -798,35 +707,6 @@ static PyObject* pyinitmmap_create(PyObject* self,  PyObject *args) {
 	sprintf(prog,"%s",b);
 	return Py_BuildValue("i", startmemmap(1,prog,s,permission));
 }
-static PyObject* pylistmap(PyObject* self,  PyObject *args) {
-	char *s;
-	int b=900; //Maximum number of mmaps to return on listmaps("string").
-	if (!PyArg_ParseTuple(args, "s",&s)) {
-		return NULL;
-	}
-	char *retval[b+10];
-	int ilist=0;
-	while(ilist<=b){
-		retval[ilist]=malloc(300);
-		retval[ilist]="";
-		ilist=ilist+1;
-	}
-	listmmaps(s,retval,b);
-	char templist[(900+10)*50];
-	char *retvalstr;
-	retvalstr=templist;
-	ilist=0;
-	strcpy(retvalstr,retval[ilist]);
-	ilist=ilist+1;
-	while(ilist<b){
-		if(strcmp(retval[ilist],"")!=0){
-			strcat(retvalstr,",");
-			strcat(retvalstr,retval[ilist]);
-		}
-		ilist=ilist+1;
-	}
-	return Py_BuildValue("s",retvalstr);
-}
 static char mmap_docs_write[] =
    "write(id,'data'): Write 'data' into id message queue. id should be the value returned by connectmmap() or createmmap().";
 static char mmap_docs_read[] =
@@ -843,8 +723,6 @@ static char mmap_docs_get_shared[] =
    "getsharedstring(id): Get a shared string that is avaliable to all programs connected to this mmap. id should be the value returned by connectmmap() or createmmap().";
 static char mmap_docs_write_shared[] =
    "writesharedstring(id,string): Writes a shared string thet is avaliable to all programs conncted to this mmap. id should be the value returned by connectmmap() or createmmap().";
-static char mmap_docs_list[] =
-   "listmaps('filepath'): List all mmap ids avaliable from the program specified in 'filepath' string. 'filepath' doesn't need to contain full location of program, the function can list partial matches. Command line arguments can also be present in 'filepath'.";
 static PyMethodDef mmap_funcs[] = {
 	{"write", (PyCFunction)writemessage, METH_VARARGS, mmap_docs_write},
 	{"read", (PyCFunction)readmessage, METH_VARARGS, mmap_docs_read},
@@ -852,7 +730,6 @@ static PyMethodDef mmap_funcs[] = {
 	{"createmmap", (PyCFunction)pyinitmmap_create, METH_VARARGS, mmap_docs_create},
 	{"getsharedstring", (PyCFunction)pygetsharedstring, METH_VARARGS, mmap_docs_get_shared},
 	{"writesharedstring", (PyCFunction)pywritesharedstring, METH_VARARGS, mmap_docs_write_shared},
-	{"listmaps", (PyCFunction)pylistmap, METH_VARARGS, mmap_docs_list},
 	{ NULL, NULL, 0, NULL}
 };
 void initfastmmap(void) {

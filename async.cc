@@ -17,11 +17,11 @@
 //---------------------------------------------------------
 //---------------------------------------------------------
 //Constants. This constants should be the same for all programs using a mmap. Diferent constants for the same mmap can result in undefined behavior.
-#define shmfolder "/dev/shm"
 #define shmpath "/dev/shm/luisvmfcomfastmmapmqshm-"
 #define bufferlength  (999999) //Number of characters in buffer. Maximum value is 999999.
 #define maxmemreturnsize  (999999) //Maximum number of characters returned by read function in one run. Maximum value is 999999.
 #define sharedstringsize  (999999) //Maximum number of characters in shared string. No maximum.
+#define maxfdnum 80
 //---------------------------------------------------------
 //---------------------------------------------------------
 //---------------------------------------------------------
@@ -46,35 +46,6 @@ int fd[bufferlength];
 volatile char *map[bufferlength+200];
 int currentcreatedmapindex=0;
 int indexb[bufferlength]={0};
-int searchb(char *fname, char *str) {
-	FILE *fp;
-	int line_num = 1;
-	int find_result = 0;
-	char temp[45+35];
-	if((fp=fopen(fname,"r"))==NULL){
-		return 0;
-	}
-	lseek((intptr_t)fp, shmsize-45, SEEK_SET);
-	while(fgets(temp,45, fp)!=NULL){
-		int isearch=0;
-		while(isearch<45){
-			if(temp[isearch]=='\0'){
-				temp[isearch]='\x17';
-			}
-			isearch=isearch+1;
-		}
-		temp[45+34]='\0';
-		if((strstr(temp, str))!=NULL){
-			return 1;
-			find_result++;
-		}
-		line_num++;
-	}
-	if(fp) {
-		fclose(fp);
-	}
-   	return 0;
-}
 int search(char *fname, char *str) {
 	FILE *fp;
 	int line_num = 1;
@@ -99,6 +70,9 @@ int search(char *fname, char *str) {
 			isearch=isearch+1;
 		}
 		if((strstr(temp, str))!=NULL){
+			if(fp) {
+				fclose(fp);
+			}
 			return 1;
 			find_result++;
 		}
@@ -109,11 +83,15 @@ int search(char *fname, char *str) {
 	}
    	return 0;
 }
-int isinshm(char *fdlink){
+int isinshm(char *fdlink,char *id){
 	struct stat sb;
 	char *linkname;
 	ssize_t r;
-	char *str=shmfolder;
+	char *str;
+	str=malloc(strlen(shmpath)+strlen(id)+3);
+	strcpy(str, shmpath);
+	strcat(str, id);
+	strcat(str, "-");
 	int retryisinshm=10;
 	int continueisinshm=0;
 	while(retryisinshm>0){
@@ -136,7 +114,7 @@ int isinshm(char *fdlink){
 		if(continueisinshm==0){
 			break;
 		}else{
-			sleep(0.01);
+			usleep(0.05*1000000);
 		}
 	}
 	if(continueisinshm==-1){
@@ -176,9 +154,14 @@ int openfd_connect(char *programlocation,char *id,mode_t permission){
 				struct dirent *dirb;
 				db=opendir(cmdlinefduri);
 				if(db){
+				int curfdnum=0;
 				while((dirb=readdir(db))!=NULL){
 				int tmpnumb = atoi(dirb->d_name);
 				if(tmpnumb==0&&(dirb->d_name)[0]!='0'){}else{
+						if(curfdnum>maxfdnum){
+							break;
+						}
+						curfdnum=curfdnum+1;
 						char *cmdlinefduric;
 						cmdlinefduric=malloc(strlen((dir->d_name))+strlen((dirb->d_name))+strlen("/proc//fd/")+1+5);
 						strcpy(cmdlinefduric, "/proc/");
@@ -188,13 +171,7 @@ int openfd_connect(char *programlocation,char *id,mode_t permission){
 						struct stat sb;
 						if(stat(cmdlinefduric, &sb)!=-1){
 							if(S_ISREG(sb.st_mode)){
-								if(isinshm(cmdlinefduric)){
-								if(searchb(cmdlinefduric,"luisvmffastmmapmq")){
-									//char *cmdlinefduric is the file uri in /proc for an unlinked fastmmapmq adress owened by program with cmdline containing char *programlocation!
-									//Lets check if this file contains char *id
-									if(searchb(cmdlinefduric,id)){
-										//We found the unlinked file we want!!! Now lets open an file descriptor to it!!!
-										//printf("found pid:%s, program: %s, file descriptor:%s\n",(dir->d_name),cmdlinefduric,(dirb->d_name));
+								if(isinshm(cmdlinefduric,id)){
 										foundfile=1;
 										char* location;
 										location=malloc(strlen(shmpath)+strlen(id)+1+strlen(cmdlinefduric));
@@ -203,9 +180,6 @@ int openfd_connect(char *programlocation,char *id,mode_t permission){
 										if (fd[currentcreatedmapindex] == -1) {
 											foundfile=0;
 										}
-
-									}
-								}
 							}
 						}
 						}
@@ -231,8 +205,10 @@ int openfd_create(char *programlocation,char *id,mode_t permission){
 		randomstring=strab;
 		sprintf(randomstring,"%i",(rand()));
 		char* location;
-		location=malloc(strlen(shmpath)+strlen(randomstring)+1);
+		location=malloc(strlen(shmpath)+strlen(randomstring)+strlen(id)+5);
 		strcpy(location, shmpath);
+		strcat(location, id);
+		strcat(location, "-");
 		strcat(location, randomstring);
 		fd[currentcreatedmapindex] = open(location, O_RDWR | O_CREAT, (mode_t) permission);
 		if (fd[currentcreatedmapindex] == -1) {
@@ -251,114 +227,47 @@ int initshm(void){
 	int lseekresult;
 	lseekresult = lseek(fd[currentcreatedmapindex-1], 2*shmsize+25+((sharedstringsize+3)*sizeof(char)), SEEK_SET);
 	if (lseekresult == -1) {
+		perror("lseek1");
 		close(fd[currentcreatedmapindex-1]);
 		return -1;
 	}
 	lseekresult = write(fd[currentcreatedmapindex-1], "", 1);
 	if (lseekresult != 1) {
+		perror("lseek2");
 		close(fd[currentcreatedmapindex-1]);
 		return -1;
 	}
 	return 0;
 }
-void listmmaps(char *programlocation,char *foundmaps[],int maxmapfindnum){
-			int foundmapcounter=0;
-			int foundfile=0;
-			DIR *d;
-			struct dirent *dir;
-			d=opendir("/proc/");
-			if(d){
-			while((dir=readdir(d))!=NULL){
-			if(foundfile==1){
-				break;
-			}
-			int tmpnum = atoi(dir->d_name);
-			if(tmpnum==0&&(dir->d_name)[0]!='0'){}else{
-				char *cmdlineuri;
-				cmdlineuri=malloc(strlen((dir->d_name))+strlen("/proc//cmdline")+1);
-				strcpy(cmdlineuri, "/proc/");
-				strcat(cmdlineuri, (dir->d_name));
-				strcat(cmdlineuri, "/cmdline");
-				if(search(cmdlineuri,programlocation)){
-				char *cmdlinefduri;
-				cmdlinefduri=malloc(strlen((dir->d_name))+strlen("/proc//fd/")+1);
-				strcpy(cmdlinefduri, "/proc/");
-				strcat(cmdlinefduri, (dir->d_name));
-				strcat(cmdlinefduri, "/fd/");
-				DIR *db;
-				struct dirent *dirb;
-				db=opendir(cmdlinefduri);
-				if(db){
-				while((dirb=readdir(db))!=NULL){
-				int tmpnumb = atoi(dirb->d_name);
-				if(tmpnumb==0&&(dirb->d_name)[0]!='0'){}else{
-						char *cmdlinefduric;
-						cmdlinefduric=malloc(strlen((dir->d_name))+strlen((dirb->d_name))+strlen("/proc//fd/")+1+5);
-						strcpy(cmdlinefduric, "/proc/");
-						strcat(cmdlinefduric, (dir->d_name));
-						strcat(cmdlinefduric, "/fd/");
-						strcat(cmdlinefduric, (dirb->d_name));
-						struct stat sb;
-						if(stat(cmdlinefduric, &sb)!=-1){
-							if(S_ISREG(sb.st_mode)){
-								if(isinshm(cmdlinefduric)){
-								if(searchb(cmdlinefduric,"luisvmffastmmapmq")){
-									//char *cmdlinefduric is the file uri in /proc for an unlinked fastmmapmq adress owened by program with cmdline containing char *programlocation!
-									//Lets check if this file contains char *id
-									int intsearchmapcounter=0;
-									int tempmmapfd=open(cmdlinefduric, O_RDONLY );
-									char *tempmmap;
-									tempmmap=mmap(0, shmsize, PROT_READ , MAP_SHARED, tempmmapfd, 0);
-									foundmaps[foundmapcounter]=malloc(180);
-									while(intsearchmapcounter<19){
-										if(maxmapfindnum==foundmapcounter){
-											foundfile=1;
-											break;
-										}
-										foundmaps[foundmapcounter][intsearchmapcounter]=tempmmap[shmsize-40+intsearchmapcounter];
-										intsearchmapcounter=intsearchmapcounter+1;
-										foundfile=1;
-									}
-									munmap(tempmmap,shmsize);
-									close(tempmmapfd);
-									foundmapcounter=foundmapcounter+1;
-								}
-							}
-						}
-						}
-				}
-				}
-				closedir(db);
-				}
-				}
-			}
-			}
-			closedir(d);
-			}
-}
-void creatememmap(void){
+int creatememmap(void){
 	map[currentcreatedmapindex-1] = mmap(0, shmsize+((sharedstringsize+3)*sizeof(char)), PROT_READ | PROT_WRITE, MAP_SHARED, fd[currentcreatedmapindex-1], 0);
 	if (map[currentcreatedmapindex-1] == MAP_FAILED) {
 		close(fd[currentcreatedmapindex-1]);
 		perror("Error on shared memory mmap");
-		exit(EXIT_FAILURE);
+		return -1;
 	}
+	return 0;
 }
 int startmemmap(int create,char *programlocation,char *id, mode_t permission){
 	if(currentcreatedmapindex>bufferlength-5){
 		perror("Maximum mmap number exceeded");
 		exit(EXIT_FAILURE);
 	}
+
 	int thismapindex=-1;
+	int openedshmstatus=1;
 	if(create==1){
 		thismapindex=openfd_create(programlocation,id,permission);
+		openedshmstatus=initshm();
 	}else{
 		thismapindex=openfd_connect(programlocation,id,permission);
+		openedshmstatus=0;
 	}
-	int openedshmstatus=initshm();
 	int jjold=0;
+	if(creatememmap()==-1){
+		return -1;
+	}
 	if(openedshmstatus==0){
-		creatememmap();
 		char strab[9]="";
 		char *dataposb;
 		dataposb=strab;
@@ -827,50 +736,6 @@ class AsyncSendWorker : public AsyncWorker {
 		std::string nodesentstring="";
 		int nodelengthb;
 };
-class AsyncListWorker : public AsyncWorker {
-	public:
-		 AsyncListWorker(Callback *callback, std::string internalstring)
-			:AsyncWorker(callback),nodeinternalstring(internalstring) {}
-		 ~AsyncListWorker() {}
-		  void Execute () {
-				char *s=nodeinternalstring.c_str(); //Program
-				int b=900; //Maximum number of mmaps to return on listmaps("string").
-				char *retval[b+10];
-				int ilist=0;
-				while(ilist<=b){
-					retval[ilist]=malloc(300);
-					retval[ilist]="";
-					ilist=ilist+1;
-				}
-				listmmaps(s,retval,b);
-				char templist[(900+10)*50];
-				char *retvalstr;
-				retvalstr=templist;
-				ilist=0;
-				strcpy(retvalstr,retval[ilist]);
-				ilist=ilist+1;
-				while(ilist<b){
-					if(strcmp(retval[ilist],"")!=0){
-						strcat(retvalstr,",");
-						strcat(retvalstr,retval[ilist]);
-					}
-					ilist=ilist+1;
-				}
-				nodereadretval=retvalstr;
-		  }
-		  void HandleOKCallback () {
-			Nan::HandleScope scope;
-			v8::Local<v8::String> jsArr = Nan::New(nodereadretval).ToLocalChecked();
-			int j=0;
-			Local<Value> argv[] = {
-				 jsArr
-			};
-			callback->Call(1, argv);
-		  }
-	private:
-		char *nodereadretval;
-		std::string nodeinternalstring="";
-};
 class AsyncwritestringWorker : public AsyncWorker {
 	public:
 		 AsyncwritestringWorker(Callback *callback, int va, std::string internalstringb, int lengthb)
@@ -1068,35 +933,6 @@ void readsync(const FunctionCallbackInfo<Value>& info) {
 	char *readsyncretval=readutils(vanode,vbnode);
 	info.GetReturnValue().Set(Nan::New(readsyncretval).ToLocalChecked());
 }
-void listsync(const FunctionCallbackInfo<Value>& info) {
-	char *s;
-	int b=900; //Maximum number of mmaps to return on listmaps("string").
-	v8::String::Utf8Value param1(info[0]->ToString());
-	std::string internalstring = std::string(*param1);
-	s=internalstring.c_str();
-	char *retval[b+10];
-	int ilist=0;
-	while(ilist<=b){
-		retval[ilist]=malloc(300);
-		retval[ilist]="";
-		ilist=ilist+1;
-	}
-	listmmaps(s,retval,b);
-	char templist[(900+10)*50];
-	char *retvalstr;
-	retvalstr=templist;
-	ilist=0;
-	strcpy(retvalstr,retval[ilist]);
-	ilist=ilist+1;
-	while(ilist<b){
-		if(strcmp(retval[ilist],"")!=0){
-			strcat(retvalstr,",");
-			strcat(retvalstr,retval[ilist]);
-		}
-		ilist=ilist+1;
-	}
-	info.GetReturnValue().Set(Nan::New(retvalstr).ToLocalChecked());
-}
 NAN_METHOD(write) {
 	int va=info[0]->NumberValue();
     v8::String::Utf8Value param2(info[1]->ToString());
@@ -1126,12 +962,6 @@ NAN_METHOD(writestringasync) {
 	int lengthb = intdatastrb.length();
 	Callback *callback = new Callback(info[2].As<Function>());
 	AsyncQueueWorker(new AsyncwritestringWorker(callback,va,internalstringb,lengthb));
-}
-NAN_METHOD(listmmapasync) {
-    v8::String::Utf8Value param1(info[0]->ToString());
-    std::string internalstring = std::string(*param1);  
-	Callback *callback = new Callback(info[1].As<Function>());
-	AsyncQueueWorker(new AsyncListWorker(callback,internalstring));
 }
 NAN_METHOD(connectmmap) {
     v8::String::Utf8Value param1(info[0]->ToString());
@@ -1170,13 +1000,10 @@ NAN_MODULE_INIT(InitAll) {
 		Nan::GetFunction(Nan::New<FunctionTemplate>(connectmmap)).ToLocalChecked());
 	Nan::Set(target, Nan::New("CreateMmapAsync").ToLocalChecked(),
 		Nan::GetFunction(Nan::New<FunctionTemplate>(createmmap)).ToLocalChecked());
-	Nan::Set(target, Nan::New("ListAsync").ToLocalChecked(),
-		Nan::GetFunction(Nan::New<FunctionTemplate>(listmmapasync)).ToLocalChecked());
 	NODE_SET_METHOD(target, "ConnectMmapSync", consync);
 	NODE_SET_METHOD(target, "CreateMmapSync", createsync);
 	NODE_SET_METHOD(target, "WriteSync", writesync);
 	NODE_SET_METHOD(target, "ReadSync", readsync);
-	NODE_SET_METHOD(target, "ListSync", listsync);
 	NODE_SET_METHOD(target, "GetSharedStringSync", getstringsync);
 	NODE_SET_METHOD(target, "WriteSharedStringSync", writestringsync);
 }
