@@ -25,7 +25,7 @@
 //---------------------------------------------------------
 #define memmappedarraysize  (bufferlength+100)
 #define shmsize (memmappedarraysize * sizeof(char))
-int fd[bufferlength];
+int fd[bufferlength]={-1};
 volatile char *map[bufferlength+200];
 int currentcreatedmapindex=0;
 int indexb[bufferlength]={0};
@@ -223,6 +223,9 @@ int initshm(void){
 	return 0;
 }
 int creatememmap(void){
+	if(fd[currentcreatedmapindex-1]==-1){
+		return -1;
+	}
 	map[currentcreatedmapindex-1] = mmap(0, shmsize+((sharedstringsize+3)*sizeof(char)), PROT_READ | PROT_WRITE, MAP_SHARED, fd[currentcreatedmapindex-1], 0);
 	if (map[currentcreatedmapindex-1] == MAP_FAILED) {
 		close(fd[currentcreatedmapindex-1]);
