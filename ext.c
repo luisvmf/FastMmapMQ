@@ -178,6 +178,9 @@ int openfd_connect(char *programlocation,char *id,mode_t permission){
 			}
 			closedir(d);
 			}
+	if(foundfile==0){
+		return -1;
+	}
 	currentcreatedmapindex=currentcreatedmapindex+1;
 	return currentcreatedmapindex-1;
 }
@@ -250,6 +253,9 @@ int startmemmap(int create,char *programlocation,char *id, mode_t permission){
 		openedshmstatus=0;
 	}
 	int jjold=0;
+	if(thismapindex==-1){
+		return -1;
+	}
 	if(creatememmap()==-1){
 		return -1;
 	}
