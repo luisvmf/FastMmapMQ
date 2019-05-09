@@ -205,7 +205,7 @@ int openfd_create(char *programlocation,char *id,mode_t permission){
 		locationbfgffsthf=malloc(strlen(shmpath)+strlen(randomstring)+1);
 		strcpy(locationbfgffsthf, shmpath);
 		strcat(locationbfgffsthf, randomstring);
-		unlink(locationbfgffsthf);
+		unlink(location);
 	currentcreatedmapindex=currentcreatedmapindex+1;
 	return currentcreatedmapindex-1;
 }
