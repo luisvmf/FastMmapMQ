@@ -81,15 +81,15 @@ int isinshm(char *fdlink,char *id){
 		if (lstat(fdlink, &sb) == -1) {
 			continueisinshm=-1;
 		}
-		linkname = malloc(sb.st_size + 1);
+		linkname = malloc(sb.st_size + 1000+100);
 		if (linkname == NULL) {
 			continueisinshm=-1;
 		}
-		r = readlink(fdlink, linkname, sb.st_size + 1);
+		r = readlink(fdlink, linkname, sb.st_size +1000+30);
 		if (r < 0) {
 			continueisinshm=-1;
 		}
-		if (r > sb.st_size) {
+		if (r > sb.st_size+1000) {
 			continueisinshm=-1;
 		}
 		retryisinshm=retryisinshm-1;
