@@ -42,7 +42,7 @@ Example:
 
 
 
-#To build Python and Nodejs modules run:
+# To build Python and Nodejs modules run:
 
 	./build-python.sh
 
