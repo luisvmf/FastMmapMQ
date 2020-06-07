@@ -33,7 +33,7 @@ int search(char *fname, char *str) {
 	int line_num = 1;
 	int find_result = 0;
 	int isearch=0;
-	char temp[350];
+	char temp[650];
 	while(isearch<350){
 		temp[isearch]='\0';
 		isearch=isearch+1;
@@ -282,6 +282,12 @@ int startmemmap(int create,char *programlocation,char *id, mode_t permission){
 		while(jjold<=19){
 			map[currentcreatedmapindex-1][shmsize-(40-jjold)]=id[jjold];
 			jjold=jjold+1;
+			if(id[jjold-1]=='\0')
+				break;
+		}
+		while(jjold<=19){
+			map[currentcreatedmapindex-1][shmsize-(40-jjold)]='\0';
+			jjold=jjold+1;		
 		}
 		char* ididentfier="luisvmffastmmapmq\x17\x17\x17";
 		jjold=0;
