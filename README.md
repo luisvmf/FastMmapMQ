@@ -26,7 +26,7 @@ Example:
 
 
 
-#Avaliable functions:
+# Avaliable functions:
 
 	write(id,'data'): Write 'data' into id message queue. id should be the value returned by connectmmap() or createmmap(). Returns 0 on success and -1 if the write failed because buffer is full, ex the program reading isn't reading fast enough.
 
