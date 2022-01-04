@@ -1,6 +1,6 @@
 # FastMmapMQ
 
-	git clone https://github.com/luisvmf/FastMmapMQ
+	git clone https://git.luisvmf.com/FastMmapMQ
 
 Fast Message queue module, witch can pass messages between different processes, for Python, nodejs and c written in C using a memory mapped file in /dev/shm.
 Currently this only works on Linux because of requirements on /dev/shm and procfs with /proc/{PID}/fd.
