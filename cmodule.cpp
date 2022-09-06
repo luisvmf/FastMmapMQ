@@ -15,7 +15,7 @@
 #include <time.h>
 #include <sys/time.h>
 #include <sys/file.h>
-#include <stdatomic.h>
+//#include <stdatomic.h>
 #include <stdint.h>
 #include <errno.h>
 
@@ -79,7 +79,7 @@ static void lockfastmmapmq(int *futexp,int lockmechanism, int mmapfd){
 					errdisplayed=1;
 				}
 			#endif
-			if(atomic_compare_exchange_strong(futexp, &one, 0)){
+			if(__sync_bool_compare_and_swap(futexp, 1, 0)){
 				return;
 			}
 			while(i<10){
@@ -88,11 +88,11 @@ static void lockfastmmapmq(int *futexp,int lockmechanism, int mmapfd){
 				}
 				i++;
 			}
-			if(atomic_compare_exchange_strong(futexp, &one, 0)){
+			if(__sync_bool_compare_and_swap(futexp, 1, 0)){
 				return;
 			}
 			#ifdef futexavaliable
-				if(atomic_compare_exchange_strong(futexp, &zero, 2)){
+				if(__sync_bool_compare_and_swap(futexp, 0, 2)){
 					s = futex(futexp, FUTEX_WAIT, 2, NULL, NULL, 0);// Wait to aquire the lock.
 					if(s==-1 && errno!=EAGAIN){
 						perror("Error at lockfutex");
@@ -116,11 +116,11 @@ static void unlockfastmmapmq(int *futexp,int lockmechanism, int mmapfd){
 		int s;
 		const uint32_t zero = 0;
 		const uint32_t two = 2;
-		if(atomic_compare_exchange_strong(futexp, &zero, 1)){
+		if(__sync_bool_compare_and_swap(futexp, 0, 1)){
 			return;	
 		}
 		#ifdef futexavaliable
-		if(atomic_compare_exchange_strong(futexp, &two, 1)){
+		if(__sync_bool_compare_and_swap(futexp, 2, 1)){
 			s = futex(futexp, FUTEX_WAKE, 1, NULL, NULL, 0);//Wake the other process. 
 			if(s==-1){
 				perror("Error at releasefutex");

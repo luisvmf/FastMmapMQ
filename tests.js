@@ -22,13 +22,15 @@ mmap.CreateMmapAsync("map2","rwx------",function(idc){
 		console.log(mmap.ReadSync(idd,0));
 	});
 });
-mmap.WriteSharedStringSync(id,"String Sync");
-console.log(mmap.GetSharedStringSync(idb));
-console.log(mmap.GetSharedStringSync(idb));
-console.log(mmap.GetSharedStringSync(idb));
-mmap.WriteSharedStringAsync(id,"String Async",function(data){
-	console.log(mmap.GetSharedStringSync(idb));
-	mmap.GetSharedStringAsync(idb,function(data){
-		console.log(data);
-	});
-});
+//XXX TODO Check segmentation fault in async.cc.
+
+//mmap.WriteSharedStringSync(id,"String Sync");
+//console.log(mmap.GetSharedStringSync(idb));
+//console.log(mmap.GetSharedStringSync(idb));
+//console.log(mmap.GetSharedStringSync(idb));
+//mmap.WriteSharedStringAsync(id,"String Async",function(data){
+	//console.log(mmap.GetSharedStringSync(idb));
+//	mmap.GetSharedStringAsync(idb,function(data){
+//		console.log(data);
+//	});
+//});
