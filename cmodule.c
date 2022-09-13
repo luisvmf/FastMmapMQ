@@ -15,7 +15,9 @@
 #include <time.h>
 #include <sys/time.h>
 #include <sys/file.h>
-#include <stdatomic.h>
+#ifndef __cplusplus
+	#include <stdatomic.h>
+#endif
 #include <stdint.h>
 #include <errno.h>
 
@@ -56,7 +58,7 @@ int fd[bufferlength]={-1};
 volatile char *map[bufferlength+200];
 int currentcreatedmapindex=0;
 int indexb[bufferlength]={0};
-int *futexpointers[bufferlength+200]={0};
+uint32_t *futexpointers[bufferlength+200]={0};
 int errdisplayed=0;
 
 static int futex(int *uaddr, int futex_op, int val, const struct timespec *timeout, int *uaddr2, int val3){
@@ -64,9 +66,17 @@ static int futex(int *uaddr, int futex_op, int val, const struct timespec *timeo
 		return syscall(SYS_futex, uaddr, futex_op, val,timeout, uaddr, val3);
 	#endif
 }
+int atomiccomparefastmmap(int *a, const uint32_t *b, int c){
+#ifdef __cplusplus
+	return __sync_bool_compare_and_swap(a,*b,c);
+#else
+	return atomic_compare_exchange_strong(a,b,c);
+#endif
+}
+
 //Aquire the lock, lockmechanism=0 for futex+spinlock and lockmechanism=1 for flock. Futex lock is faster but a deadlock may occur if one of the processes is terminated while a writemmap/ readmmap call is on progress.
 //If the programs doing the read/write are independent, it is recommended using the flock, unless performance is critical.
-static void lockfastmmapmq(int *futexp,int lockmechanism, int mmapfd){
+static void lockfastmmapmq(uint32_t *futexp,int lockmechanism, int mmapfd){
 	if(lockmechanism==0){
 		int s;
 		while(1){
@@ -79,7 +89,7 @@ static void lockfastmmapmq(int *futexp,int lockmechanism, int mmapfd){
 					errdisplayed=1;
 				}
 			#endif
-			if(atomic_compare_exchange_strong(futexp, &one, 0)){
+			if(atomiccomparefastmmap(futexp, &one, 0)){
 				return;
 			}
 			while(i<10){
@@ -88,11 +98,11 @@ static void lockfastmmapmq(int *futexp,int lockmechanism, int mmapfd){
 				}
 				i++;
 			}
-			if(atomic_compare_exchange_strong(futexp, &one, 0)){
+			if(atomiccomparefastmmap(futexp, &one, 0)){
 				return;
 			}
 			#ifdef futexavaliable
-				if(atomic_compare_exchange_strong(futexp, &zero, 2)){
+				if(atomiccomparefastmmap(futexp, &zero, 2)){
 					s = futex(futexp, FUTEX_WAIT, 2, NULL, NULL, 0);// Wait to aquire the lock.
 					if(s==-1 && errno!=EAGAIN){
 						perror("Error at lockfutex");
@@ -116,11 +126,11 @@ static void unlockfastmmapmq(int *futexp,int lockmechanism, int mmapfd){
 		int s;
 		const uint32_t zero = 0;
 		const uint32_t two = 2;
-		if(atomic_compare_exchange_strong(futexp, &zero, 1)){
+		if(atomiccomparefastmmap(futexp, &zero, 1)){
 			return;	
 		}
 		#ifdef futexavaliable
-		if(atomic_compare_exchange_strong(futexp, &two, 1)){
+		if(atomiccomparefastmmap(futexp, &two, 1)){
 			s = futex(futexp, FUTEX_WAKE, 1, NULL, NULL, 0);//Wake the other process. 
 			if(s==-1){
 				perror("Error at releasefutex");
@@ -343,7 +353,7 @@ int creatememmap(void){
 		perror("Error on shared memory mmap");
 		return -1;
 	}
-	futexpointers[currentcreatedmapindex-1]= (int*)(&(map[currentcreatedmapindex-1][shmsize+((sharedstringsize+3)*sizeof(char))+3]));//TODO XXX TODO change to the beggining of the map to prevent aligment issues when constants of the size of the map are modified.
+	futexpointers[currentcreatedmapindex-1]= (uint32_t*)(&(map[currentcreatedmapindex-1][shmsize+((sharedstringsize+3)*sizeof(char))+3]));//TODO XXX TODO change to the beggining of the map to prevent aligment issues when constants of the size of the map are modified.
 	return 0;
 }
 int startmemmap(int create,char *programlocation,char *id, mode_t permission){
@@ -561,7 +571,17 @@ char *readmmap(int readmapindexselect,int gfifghdughfid) {
 		exit(EXIT_FAILURE);
 	}
 	if(gfifghdughfid==0){
-		char stra[maxmemreturnsize+100]="";
+		//char stra[maxmemreturnsize+100]="";
+		char *stra=malloc((maxmemreturnsize+100)*sizeof(char));
+		if(stra==NULL){
+			perror("Malloc fail on readmmap");
+			exit(EXIT_FAILURE);
+		}
+		int n=0;
+		while(n<(maxmemreturnsize+100)){
+			stra[n]='\0';
+			n++;
+		}
 		char *tmpstr;
 		tmpstr=stra;
 		char strab[9]="";
@@ -595,11 +615,13 @@ char *readmmap(int readmapindexselect,int gfifghdughfid) {
 		sprintf(dataposbc,"%c%c",map[readmapindexselect][15],map[readmapindexselect][16]);
 		int i=indexb[readmapindexselect]+17;
 		if(indexb[readmapindexselect]==index-17){
-			return "";
+			tmpstr[0]='\0';
+			return tmpstr;
 		}else{
 		if(indexb[readmapindexselect]==index){
 			if(index==0){
-				return "";
+				tmpstr[0]='\0';
+				return tmpstr;
 			}
 		}
 		if(i>=index){
@@ -672,7 +694,17 @@ char *readmmap(int readmapindexselect,int gfifghdughfid) {
 		//}
 		lockfastmmapmq(futexpointers[readmapindexselect],lockmechanismconst,fd[readmapindexselect]);
 		//map[readmapindexselect][shmsize-41]='A';
-		char stra[maxmemreturnsize+100]="";
+		//char stra[maxmemreturnsize+100]="";
+		char *stra=malloc((maxmemreturnsize+100)*sizeof(char));
+		if(stra==NULL){
+			perror("Malloc fail on readmmap");
+			exit(EXIT_FAILURE);
+		}
+		int n=0;
+		while(n<(maxmemreturnsize+100)){
+			stra[n]='\0';
+			n++;
+		}
 		char *tmpstr;
 		tmpstr=stra;
 		char strab[9]="";
@@ -693,12 +725,14 @@ char *readmmap(int readmapindexselect,int gfifghdughfid) {
 		int i=indexb[readmapindexselect]+17;
 		if(indexb[readmapindexselect]==index-17){
 			//map[readmapindexselect][shmsize-41]='\0';
-			return "";
+			tmpstr[0]='\0';
+			return tmpstr;
 		}else{
 		if(indexb[readmapindexselect]==index){
 			if(index==0){
 				//map[readmapindexselect][shmsize-41]='\0';
-				return "";
+				tmpstr[0]='\0';
+				return tmpstr;
 			}
 		}
 		if(i>=index){
@@ -762,9 +796,7 @@ int createmmap(char *b,char *s) {
 	return startmemmap(1,prog,b,permission);
 }
 char *getsharedstring(int readmapindexselect) {
-	char stra[sharedstringsize+5]="";
-	char *tmpstring="";
-	tmpstring=stra;
+	char *tmpstring=malloc(sharedstringsize+5);
 	if(readmapindexselect<0){
 		perror("Invalid mmap id on read");
 		exit(EXIT_FAILURE);

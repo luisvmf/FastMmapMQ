@@ -14,7 +14,7 @@
 #include <dirent.h>
 #include <time.h>
 #include <sys/time.h>
-#include "cmodule.cpp"
+#include "cmodule.c"
 
 using namespace v8;
 using v8::Function;
@@ -45,6 +45,7 @@ class AsyncreadWorker : public AsyncWorker {
 		  void HandleOKCallback () {
 			Nan::HandleScope scope;
 			v8::Local<v8::String> jsArr = Nan::New(nodereadretval).ToLocalChecked();
+			free(nodereadretval);
 			int j=0;
 			Local<Value> argv[] = {
 				 jsArr
@@ -168,6 +169,7 @@ class AsyncreadstringWorker : public AsyncWorker {
 		  void HandleOKCallback () {
 			Nan::HandleScope scope;
 			v8::Local<v8::String> jsArr = Nan::New(nodereadretval).ToLocalChecked();
+			free(nodereadretval);
 			int j=0;
 			Local<Value> argv[] = {
 				 jsArr
@@ -231,13 +233,16 @@ void writestringsync(const FunctionCallbackInfo<Value>& info) {
 }
 void getstringsync(const FunctionCallbackInfo<Value>& info) {
 	int vanode=info[0]->NumberValue();
-	info.GetReturnValue().Set(Nan::New(getsharedstring(vanode)).ToLocalChecked());
+	char *b=getsharedstring(vanode);
+	info.GetReturnValue().Set(Nan::New(b).ToLocalChecked());
+	free(b);
 }
 void readsync(const FunctionCallbackInfo<Value>& info) {
 	int vanode=info[0]->NumberValue();
 	int vbnode=info[1]->NumberValue();
 	char *readsyncretval=readmmap(vanode,vbnode);
 	info.GetReturnValue().Set(Nan::New(readsyncretval).ToLocalChecked());
+	free(readsyncretval);
 }
 NAN_METHOD(write) {
 	int va=info[0]->NumberValue();
