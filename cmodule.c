@@ -35,7 +35,7 @@
 
 #define lockmechanismconst 0 //XXX TODO add as a option when creating mmap.
 
-//XXX TODO Check locking in getsharedstring and writesharedstring.
+
 //XXX TODO freebsd support, futex and connection without procfs.
 
 #ifdef futexavaliable
@@ -44,7 +44,6 @@
 #endif
 
 //XXX TODO put the global variables on a struct, add better function names to prevent collisions.
-//XXX TODO malloc return char*, current behavior is odd.
 
 //Constants. FastMmapMQ has been validated to work using only the constants defined bellow. Changing this may cause errors. This constants should be the same for all programs using a mmap. Diferent constants for the same mmap will result in undefined behavior.
 #define shmpath "/dev/shm/luisvmfcomfast2mapmqshm-"
@@ -333,7 +332,7 @@ int openfd_create(char *programlocation,char *id,mode_t permission){
 }
 int initshm(void){
 	int lseekresult;
-	lseekresult = lseek(fd[currentcreatedmapindex-1], 2*shmsize+25+((sharedstringsize+3)*sizeof(char)), SEEK_SET);//TODO XXX check this size with the mmap() call on the function below.
+	lseekresult = lseek(fd[currentcreatedmapindex-1], 2*shmsize+25+((sharedstringsize+3)*sizeof(char)), SEEK_SET);
 	if (lseekresult == -1) {
 		perror("lseek1");
 		close(fd[currentcreatedmapindex-1]);
@@ -812,8 +811,9 @@ char *getsharedstring(int readmapindexselect) {
 		perror("Invalid mmap id on read");
 		exit(EXIT_FAILURE);
 	}
-	while(map[readmapindexselect][shmsize-42]=='A'){}
-	map[readmapindexselect][shmsize-42]='A';
+	//while(map[readmapindexselect][shmsize-42]=='A'){}
+	//map[readmapindexselect][shmsize-42]='A';
+	lockfastmmapmq(futexpointers[readmapindexselect],lockmechanismconst,fd[readmapindexselect]);
 	int i=memmappedarraysize;
 	while(i<memmappedarraysize+sharedstringsize){
 		tmpstring[i-memmappedarraysize]=map[readmapindexselect][i];
@@ -822,7 +822,8 @@ char *getsharedstring(int readmapindexselect) {
 		}
 		i=i+1;
 	}
-	map[readmapindexselect][shmsize-42]='\0';
+	//map[readmapindexselect][shmsize-42]='\0';
+	unlockfastmmapmq(futexpointers[readmapindexselect],lockmechanismconst,fd[readmapindexselect]);
 	return tmpstring;
 }
 int writesharedstring(int readmapindexselect,char* tmpstring) {
@@ -835,8 +836,9 @@ int writesharedstring(int readmapindexselect,char* tmpstring) {
 		perror("Invalid mmap id on write");
 		exit(EXIT_FAILURE);
 	}
-	while(map[readmapindexselect][shmsize-42]=='A'){}
-	map[readmapindexselect][shmsize-42]='A';
+	//while(map[readmapindexselect][shmsize-42]=='A'){}
+	//map[readmapindexselect][shmsize-42]='A';
+	lockfastmmapmq(futexpointers[readmapindexselect],lockmechanismconst,fd[readmapindexselect]);
 	int i=memmappedarraysize;
 	while(i<memmappedarraysize+sharedstringsize){
 		map[readmapindexselect][i]=tmpstring[i-memmappedarraysize];
@@ -845,7 +847,8 @@ int writesharedstring(int readmapindexselect,char* tmpstring) {
 			break;
 		}
 	}
-	map[readmapindexselect][i]='\0';
-	map[readmapindexselect][shmsize-42]='\0';
+	//map[readmapindexselect][i]='\0';
+	//map[readmapindexselect][shmsize-42]='\0';
+	unlockfastmmapmq(futexpointers[readmapindexselect],lockmechanismconst,fd[readmapindexselect]);
 	return 0;
 }
