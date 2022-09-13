@@ -280,6 +280,9 @@ int openfd_connect(char *programlocation,char *id,mode_t permission){
 										fd[currentcreatedmapindex] = open(location, O_RDWR);
 										if (fd[currentcreatedmapindex] == -1) {
 											foundfile=0;
+											free(location);//XXX added fix leak 2022
+											free(cmdlinefduri);//XXX added fix leak 2022
+											free(cmdlinefduric);//XXX added fix leak 2022
 										}
 							}
 						}
@@ -292,6 +295,7 @@ int openfd_connect(char *programlocation,char *id,mode_t permission){
 				closedir(db);
 				}
 				}
+				free(cmdlineuri);//XXX added fix leak 2022
 			}
 			}
 			closedir(d);
@@ -372,9 +376,11 @@ int startmemmap(int create,char *programlocation,char *id, mode_t permission){
 	}
 	int jjold=0;
 	if(thismapindex==-1){
+		free(programlocation);
 		return -1;
 	}
 	if(creatememmap()==-1){
+		free(programlocation);
 		return -1;
 	}
 	if(openedshmstatus==0){
@@ -418,6 +424,7 @@ int startmemmap(int create,char *programlocation,char *id, mode_t permission){
 		}
 		return thismapindex;
 	}else{
+		free(programlocation);
 		return -1;
 	}
 }
