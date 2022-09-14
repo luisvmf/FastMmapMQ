@@ -9,8 +9,7 @@ Currently this only works on Linux because of requirements on /dev/shm and procf
 
 To see the example of passing messages between different processes run:
 
-	gcc -o send_example send_example.c
-	gcc -o receive_example receive_example.c
+	make c-demo
 
 and then in one terminal run:
 
@@ -47,9 +46,9 @@ Example:
 
 # To build Python and Nodejs modules run:
 
-	./build-python.sh
+	make python-module
 
-	./build-node.sh
+	make node-module
 
 Then check tests.py, tests.js and test.c for API examples,these files are just for demonstrating the API so they pass messages on the same process.
 
@@ -82,7 +81,7 @@ node tests.js
 	map1,test,map1,map1,map1,map2,map1,test,map1,map1,map1
 	test 
 
-./build-c.sh
+make c-demo
 
 ./test
 

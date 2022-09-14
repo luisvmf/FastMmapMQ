@@ -1,4 +1,4 @@
-#include "cmodule.c"
+#include "src/fastmmapmq.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -6,15 +6,15 @@
 
 
 void main(void){
-int mapid=createmmap("testmmapidb","rwx------",1);
-int mapidhjkc=createmmap("testmmapbe","rwx------",1);
-int mapidb=connectmmap("test","testmmapidb");
+int mapid=fastmmapmq_createmmap("testmmapidb","rwx------",1);
+int mapidhjkc=fastmmapmq_createmmap("testmmapbe","rwx------",1);
+int mapidb=fastmmapmq_connectmmap("test","testmmapidb");
 char *foundmaps[20];
-writemmap(mapid,"aaab");
-writemmap(mapid,"aaab");
-printf("%s\n",readmmap(mapidb,1));
-writemmap(mapid,"aaac");
-printf("%s\n",readmmap(mapidb,1));
-writesharedstring(mapid,"shared string");
-printf("%s\n",getsharedstring(mapidb));
+fastmmapmq_writemmap(mapid,"aaab");
+fastmmapmq_writemmap(mapid,"aaab");
+printf("%s\n",fastmmapmq_readmmap(mapidb,1));
+fastmmapmq_writemmap(mapid,"aaac");
+printf("%s\n",fastmmapmq_readmmap(mapidb,1));
+fastmmapmq_writesharedstring(mapid,"shared string");
+printf("%s\n",fastmmapmq_getsharedstring(mapidb));
 }

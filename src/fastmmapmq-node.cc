@@ -43,7 +43,7 @@ class AsyncreadWorker : public AsyncWorker {
 		  void Execute () {
 				int a=valinputnodereada;  //id
 				int b=valinputnodereadb;  //command
-				nodereadretval=readmmap(a,b);
+				nodereadretval=fastmmapmq_readmmap(a,b);
 		  }
 		  void HandleOKCallback () {
 			Nan::HandleScope scope;
@@ -68,7 +68,7 @@ class AsyncConnectWorker : public AsyncWorker {
 		  void Execute () {
 				const char *str=nodeinternalstring.c_str(); //Program
 				const char *strb=nodeinternalstringb.c_str(); //id
-				nodeconretval=connectmmap(str,strb);
+				nodeconretval=fastmmapmq_connectmmap(str,strb);
 		  }
 		  void HandleOKCallback () {
 			Nan::HandleScope scope;
@@ -87,13 +87,13 @@ class AsyncConnectWorker : public AsyncWorker {
 };
 class AsyncCreateWorker : public AsyncWorker {
 	public:
-		 AsyncCreateWorker(Callback *callback, std::string internalstring, int length, std::string internalstringb, int lengthb)
-			:AsyncWorker(callback),nodeinternalstring(internalstring),nodelength(length),nodeinternalstringb(internalstringb),nodelengthb(lengthb) {}
+		 AsyncCreateWorker(Callback *callback, std::string internalstring, int length, std::string internalstringb, int lengthb, int lockingmodeint)
+			:AsyncWorker(callback),nodeinternalstring(internalstring),nodelength(length),nodeinternalstringb(internalstringb),nodelengthb(lengthb),lockingmode(lockingmodeint) {}
 		 ~AsyncCreateWorker() {}
 		  void Execute () {
 				const char *str=nodeinternalstring.c_str(); //Program
 				const char *strb=nodeinternalstringb.c_str(); //id
-				nodeconretval=createmmap(str,strb,0);
+				nodeconretval=fastmmapmq_createmmap(str,strb,lockingmode);
 		  }
 		  void HandleOKCallback () {
 			Nan::HandleScope scope;
@@ -109,6 +109,7 @@ class AsyncCreateWorker : public AsyncWorker {
 		int nodelength;
 		std::string nodeinternalstringb="";
 		int nodelengthb;
+		int lockingmode=1;
 };
 class AsyncSendWorker : public AsyncWorker {
 	public:
@@ -118,7 +119,7 @@ class AsyncSendWorker : public AsyncWorker {
 		  void Execute () {
 				int a=valinputnodesend; //id
 				const char *str=nodesentstring.c_str();  //Data
-				nodesendretval=writemmap(a,str);
+				nodesendretval=fastmmapmq_writemmap(a,str);
 		  }
 		  void HandleOKCallback () {
 			Nan::HandleScope scope;
@@ -143,7 +144,7 @@ class AsyncwritestringWorker : public AsyncWorker {
 				int vanode=valinputnodesend;
 				char *tmpstring="";
 				tmpstring=nodesentstring.c_str();
-				writesharedstring(vanode,tmpstring);
+				fastmmapmq_writesharedstring(vanode,tmpstring);
 				nodesendretval=0;
 		  }
 		  void HandleOKCallback () {
@@ -167,7 +168,7 @@ class AsyncreadstringWorker : public AsyncWorker {
 		 ~AsyncreadstringWorker() {}
 		  void Execute () {
 			int vanode=valinputnodereada;
-			nodereadretval=getsharedstring(vanode);
+			nodereadretval=fastmmapmq_getsharedstring(vanode);
 		  }
 		  void HandleOKCallback () {
 			Nan::HandleScope scope;
@@ -196,7 +197,7 @@ void consync(const FunctionCallbackInfo<Value>& info) {
 	char *prog;
 	prog=malloc(strlen(internalstring.c_str())+1);
 	sprintf(prog,"%s",internalstring.c_str());
-	int nodeconretval=connectmmap(prog,internalstringb.c_str());
+	int nodeconretval=fastmmapmq_connectmmap(prog,internalstringb.c_str());
 	info.GetReturnValue().Set(nodeconretval);
 }
 void createsync(const FunctionCallbackInfo<Value>& info) {
@@ -207,43 +208,39 @@ void createsync(const FunctionCallbackInfo<Value>& info) {
 	v8::String::Utf8Value param2(info[1]->ToString());
 	std::string internalstringb = std::string(*param2);  
 	Nan::Utf8String intdatastrb(info[1]);
+	int locking=info[2]->NumberValue();
 	int lengthb = intdatastrb.length();
 	char *prog;
 	prog=malloc(strlen(internalstring.c_str())+1);
 	sprintf(prog,"%s",internalstring.c_str());
 	char *perm=internalstringb.c_str();
-	int nodeconretval=createmmap(prog,perm,0);
+	int nodeconretval=fastmmapmq_createmmap(prog,perm,locking);
 	info.GetReturnValue().Set(nodeconretval);
 }
 void writesync(const FunctionCallbackInfo<Value>& info) {
 	int vanode=info[0]->NumberValue();
     v8::String::Utf8Value param2(info[1]->ToString());
     std::string internalstringbnode = std::string(*param2);  
-	info.GetReturnValue().Set(writemmap(vanode,internalstringbnode.c_str()));
+	info.GetReturnValue().Set(fastmmapmq_writemmap(vanode,internalstringbnode.c_str()));
 }
 void writestringsync(const FunctionCallbackInfo<Value>& info) {
 	int vanode=info[0]->NumberValue();
     v8::String::Utf8Value param2(info[1]->ToString());
     std::string internalstringbnode = std::string(*param2);
 	int readmapindexselect=vanode;
-	char stra[sharedstringsize+5]="";
-	char *tmpstring="";
-	tmpstring=stra;
-	tmpstring=internalstringbnode.c_str();
-	int i=memmappedarraysize;
-	writesharedstring(readmapindexselect,tmpstring);
+	fastmmapmq_writesharedstring(readmapindexselect,internalstringbnode.c_str());
 	info.GetReturnValue().Set(0);
 }
 void getstringsync(const FunctionCallbackInfo<Value>& info) {
 	int vanode=info[0]->NumberValue();
-	char *b=getsharedstring(vanode);
+	char *b=fastmmapmq_getsharedstring(vanode);
 	info.GetReturnValue().Set(Nan::New(b).ToLocalChecked());
 	free(b);
 }
 void readsync(const FunctionCallbackInfo<Value>& info) {
 	int vanode=info[0]->NumberValue();
 	int vbnode=info[1]->NumberValue();
-	char *readsyncretval=readmmap(vanode,vbnode);
+	char *readsyncretval=fastmmapmq_readmmap(vanode,vbnode);
 	info.GetReturnValue().Set(Nan::New(readsyncretval).ToLocalChecked());
 	free(readsyncretval);
 }
@@ -298,8 +295,9 @@ NAN_METHOD(createmmap) {
     std::string internalstringb = std::string(*param2);  
 	Nan::Utf8String intdatastrb(info[1]);
 	int lengthb = intdatastrb.length();
-	Callback *callback = new Callback(info[2].As<Function>());
-	AsyncQueueWorker(new AsyncCreateWorker(callback,internalstring,length,internalstringb,lengthb));
+	int lockingmode=info[2]->NumberValue();
+	Callback *callback = new Callback(info[3].As<Function>());
+	AsyncQueueWorker(new AsyncCreateWorker(callback,internalstring,length,internalstringb,lengthb,lockingmode));
 }
 NAN_MODULE_INIT(InitAll) {
 	Nan::Set(target, Nan::New("WriteAsync").ToLocalChecked(),
