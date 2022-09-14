@@ -6,8 +6,8 @@
 
 
 void main(void){
-int mapid=createmmap("testmmapidb","rwx------");
-int mapidhjkc=createmmap("testmmapbe","rwx------");
+int mapid=createmmap("testmmapidb","rwx------",1);
+int mapidhjkc=createmmap("testmmapbe","rwx------",1);
 int mapidb=connectmmap("test","testmmapidb");
 char *foundmaps[20];
 writemmap(mapid,"aaab");

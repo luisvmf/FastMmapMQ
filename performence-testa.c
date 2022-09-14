@@ -6,7 +6,7 @@
 
 
 int main(void){
-	int mapid=createmmap("testmmapidb","rwx------");
+	int mapid=createmmap("testmmapidb","rwx------",0);
 
 	int i=900000;
 	while(i>0){

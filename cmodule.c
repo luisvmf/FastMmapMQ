@@ -21,6 +21,16 @@
 #include <stdint.h>
 #include <errno.h>
 
+
+//--------------------------------------------------------
+//--------------------------------------------------------
+//mmaped file structure:
+//--------------------------------------------------------
+// map[mapindex][i]=| 0 | 1 | 2 | 3  | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 |  15   |    16     | 17 | 18 | 19 | ...............|  shmsize-42  |shmsize-41|..............
+//                  |uint32_t w_index|uint32_t futex |uint32_t r_index |uint32_t reset_counter| mmap State| circular buffer data .........| Locking type |Future use| Shared string
+//--------------------------------------------------------
+//--------------------------------------------------------
+
 //---------------------------------------------------------
 //---------------------------------------------------------
 // Library configurations, use the same value on all FastMmapMQ instances that may connect with each other.
@@ -33,7 +43,6 @@
 //---------------------------------------------------------
 
 
-#define lockmechanismconst 0 //XXX TODO add as a option when creating mmap.
 
 
 //XXX TODO freebsd support, futex and connection without procfs.
@@ -54,18 +63,18 @@
 #define memmappedarraysize  (bufferlength+100)
 #define shmsize (memmappedarraysize * sizeof(char))
 int fd[bufferlength]={-1};
-volatile char *map[bufferlength+200];
+volatile uint8_t *map[bufferlength+200];
 int currentcreatedmapindex=0;
 int indexb[bufferlength]={0};
 uint32_t *futexpointers[bufferlength+200]={0};
 int errdisplayed=0;
 
-static int futex(int *uaddr, int futex_op, int val, const struct timespec *timeout, int *uaddr2, int val3){
+static int futex(uint32_t *uaddr, int futex_op, int val, const struct timespec *timeout, int *uaddr2, int val3){
 	#ifdef futexavaliable
 		return syscall(SYS_futex, uaddr, futex_op, val,timeout, uaddr, val3);
 	#endif
 }
-int atomiccomparefastmmap(int *a, const uint32_t *b, int c){
+int atomiccomparefastmmap(uint32_t *a, const uint32_t *b, int c){
 #ifdef __cplusplus
 	return __sync_bool_compare_and_swap(a,*b,c);
 #else
@@ -75,7 +84,7 @@ int atomiccomparefastmmap(int *a, const uint32_t *b, int c){
 
 //Aquire the lock, lockmechanism=0 for futex+spinlock and lockmechanism=1 for flock. Futex lock is faster but a deadlock may occur if one of the processes is terminated while a writemmap/ readmmap call is on progress.
 //If the programs doing the read/write are independent, it is recommended using the flock, unless performance is critical.
-static void lockfastmmapmq(uint32_t *futexp,int lockmechanism, int mmapfd){
+static void lockfastmmapmq(uint32_t *futexp,uint32_t lockmechanism, int mmapfd){
 	if(lockmechanism==0){
 		int s;
 		while(1){
@@ -111,6 +120,7 @@ static void lockfastmmapmq(uint32_t *futexp,int lockmechanism, int mmapfd){
 			#endif
 		}
 	}else{
+		//printf("flock");
 		int flockres=flock(mmapfd,LOCK_EX);
 		if(flockres==-1){
 			perror("flock(fd,LOCK_EX) failled");
@@ -120,7 +130,7 @@ static void lockfastmmapmq(uint32_t *futexp,int lockmechanism, int mmapfd){
 }
 //Release the lock, lockmechanism=0 for futex+spinlock and lockmechanism=1 for flock. Futex lock is faster but a deadlock may occur if one of the processes is terminated while a writemmap/ readmmap call is on progress.
 //If the programs doing the read/write are independent, it is recommended using the flock, unless performance is critical.
-static void unlockfastmmapmq(int *futexp,int lockmechanism, int mmapfd){
+static void unlockfastmmapmq(uint32_t *futexp,uint32_t lockmechanism, int mmapfd){
 	if(lockmechanism==0){
 		int s;
 		const uint32_t zero = 0;
@@ -137,6 +147,7 @@ static void unlockfastmmapmq(int *futexp,int lockmechanism, int mmapfd){
 		}
 		#endif
 	}else{
+		//printf("flock");
 		int flockres=flock(mmapfd,LOCK_UN);
 		if(flockres==-1){
 			perror("flock(fd,LOCK_UN) failled");
@@ -188,7 +199,7 @@ int isinshm(char *fdlink,char *id){
 	char *linkname;
 	ssize_t r;
 	char *str;
-	str=malloc(strlen(shmpath)+strlen(id)+3);
+	str=(char *)malloc(strlen(shmpath)+strlen(id)+3);
 	strcpy(str, shmpath);
 	strcat(str, id);
 	strcat(str, "-");
@@ -199,7 +210,7 @@ int isinshm(char *fdlink,char *id){
 		if (lstat(fdlink, &sb) == -1) {
 			continueisinshm=-1;
 		}
-		linkname = malloc(sb.st_size + 1000+100);
+		linkname = (char *)malloc(sb.st_size + 1000+100);
 		if (linkname == NULL) {
 			continueisinshm=-1;
 		}
@@ -240,13 +251,13 @@ int openfd_connect(char *programlocation,char *id,mode_t permission){
 			int tmpnum = atoi(dir->d_name);
 			if(tmpnum==0&&(dir->d_name)[0]!='0'){}else{
 				char *cmdlineuri;
-				cmdlineuri=malloc(strlen((dir->d_name))+strlen("/proc//cmdline")+1);
+				cmdlineuri=(char *)malloc(strlen((dir->d_name))+strlen("/proc//cmdline")+1);
 				strcpy(cmdlineuri, "/proc/");
 				strcat(cmdlineuri, (dir->d_name));
 				strcat(cmdlineuri, "/cmdline");
 				if(search(cmdlineuri,programlocation)){
 				char *cmdlinefduri;
-				cmdlinefduri=malloc(strlen((dir->d_name))+strlen("/proc//fd/")+1);
+				cmdlinefduri=(char *)malloc(strlen((dir->d_name))+strlen("/proc//fd/")+1);
 				strcpy(cmdlinefduri, "/proc/");
 				strcat(cmdlinefduri, (dir->d_name));
 				strcat(cmdlinefduri, "/fd/");
@@ -263,7 +274,7 @@ int openfd_connect(char *programlocation,char *id,mode_t permission){
 						}
 						curfdnum=curfdnum+1;
 						char *cmdlinefduric;
-						cmdlinefduric=malloc(strlen((dir->d_name))+strlen((dirb->d_name))+strlen("/proc//fd/")+1+5);
+						cmdlinefduric=(char *)malloc(strlen((dir->d_name))+strlen((dirb->d_name))+strlen("/proc//fd/")+1+5);
 						strcpy(cmdlinefduric, "/proc/");
 						strcat(cmdlinefduric, (dir->d_name));
 						strcat(cmdlinefduric, "/fd/");
@@ -274,14 +285,14 @@ int openfd_connect(char *programlocation,char *id,mode_t permission){
 								if(isinshm(cmdlinefduric,id)){
 										foundfile=1;
 										char* location;
-										location=malloc(strlen(shmpath)+strlen(id)+1+strlen(cmdlinefduric));
+										location=(char *)malloc(strlen(shmpath)+strlen(id)+1+strlen(cmdlinefduric));
 										strcpy(location, cmdlinefduric);
 										fd[currentcreatedmapindex] = open(location, O_RDWR);
 										if (fd[currentcreatedmapindex] == -1) {
 											foundfile=0;
-											free(location);//XXX added fix leak 2022
-											free(cmdlinefduri);//XXX added fix leak 2022
-											free(cmdlinefduric);//XXX added fix leak 2022
+											free(location);
+											free(cmdlinefduri);
+											free(cmdlinefduric);
 										}
 							}
 						}
@@ -294,7 +305,7 @@ int openfd_connect(char *programlocation,char *id,mode_t permission){
 				closedir(db);
 				}
 				}
-				free(cmdlineuri);//XXX added fix leak 2022
+				free(cmdlineuri);
 			}
 			}
 			closedir(d);
@@ -312,7 +323,7 @@ int openfd_create(char *programlocation,char *id,mode_t permission){
 		randomstring=strab;
 		sprintf(randomstring,"%i",(rand()));
 		char* location;
-		location=malloc(strlen(shmpath)+strlen(randomstring)+strlen(id)+5);
+		location=(char *)malloc(strlen(shmpath)+strlen(randomstring)+strlen(id)+5);
 		strcpy(location, shmpath);
 		strcat(location, id);
 		strcat(location, "-");
@@ -323,7 +334,7 @@ int openfd_create(char *programlocation,char *id,mode_t permission){
 			exit(EXIT_FAILURE);
 		}
 		char* locationbfgffsthf;
-		locationbfgffsthf=malloc(strlen(shmpath)+strlen(randomstring)+1);
+		locationbfgffsthf=(char *)malloc(strlen(shmpath)+strlen(randomstring)+1);
 		strcpy(locationbfgffsthf, shmpath);
 		strcat(locationbfgffsthf, randomstring);
 		unlink(location);
@@ -350,16 +361,16 @@ int creatememmap(void){
 	if(fd[currentcreatedmapindex-1]==-1){
 		return -1;
 	}
-	map[currentcreatedmapindex-1] = mmap(0, shmsize+((sharedstringsize+3)*sizeof(char)), PROT_READ | PROT_WRITE, MAP_SHARED, fd[currentcreatedmapindex-1], 0);
+	map[currentcreatedmapindex-1] = (volatile uint8_t *)mmap(0, shmsize+((sharedstringsize+3)*sizeof(char)), PROT_READ | PROT_WRITE, MAP_SHARED, fd[currentcreatedmapindex-1], 0);
 	if (map[currentcreatedmapindex-1] == MAP_FAILED) {
 		close(fd[currentcreatedmapindex-1]);
 		perror("Error on shared memory mmap");
 		return -1;
 	}
-	futexpointers[currentcreatedmapindex-1]= (uint32_t*)(&(map[currentcreatedmapindex-1][shmsize+((sharedstringsize+3)*sizeof(char))+3]));//TODO XXX TODO change to the beggining of the map to prevent aligment issues when constants of the size of the map are modified.
+	futexpointers[currentcreatedmapindex-1]= (uint32_t*)(&(map[currentcreatedmapindex-1][4]));
 	return 0;
 }
-int startmemmap(int create,char *programlocation,char *id, mode_t permission){
+int startmemmap(int create,char *programlocation,char *id, mode_t permission,int locking){
 	if(currentcreatedmapindex>bufferlength-5){
 		perror("Maximum mmap number exceeded");
 		exit(EXIT_FAILURE);
@@ -385,24 +396,25 @@ int startmemmap(int create,char *programlocation,char *id, mode_t permission){
 	if(openedshmstatus==0){
 		*futexpointers[currentcreatedmapindex-1]=1;//Start futex unlocked.
 		char strab[9]="";
-		char *dataposb;
-		dataposb=strab;
 		indexb[currentcreatedmapindex-1]=0;
-		if(map[currentcreatedmapindex-1][7]!='\x17'){
-		if(map[currentcreatedmapindex-1][7]!='\x21'){
-			jjold=0;
-			while(jjold<=16){
-				map[currentcreatedmapindex-1][jjold]='0';
-				jjold=jjold+1;
+		if(map[currentcreatedmapindex-1][16]!='\x17'){
+		if(map[currentcreatedmapindex-1][16]!='\x21'){
+			uint32_t *indexaux1=(uint32_t*)(&(map[currentcreatedmapindex-1][0]));
+			*indexaux1=0;
+			uint32_t *indexaux2=(uint32_t*)(&(map[currentcreatedmapindex-1][8]));
+			*indexaux2=0;
+			uint32_t *indexaux3=(uint32_t*)(&(map[currentcreatedmapindex-1][12]));
+			*indexaux3=0;
+			if(locking==1){
+				map[currentcreatedmapindex-1][shmsize-42]='A';
+			}else{
+				map[currentcreatedmapindex-1][shmsize-42]='B';
 			}
+			map[currentcreatedmapindex-1][16]='0';
 		}
 		}
-		map[currentcreatedmapindex-1][7]='\x17';
+		map[currentcreatedmapindex-1][16]='\x17';
 		jjold=0;
-		while(jjold<=6){
-			dataposb[jjold]=map[currentcreatedmapindex-1][jjold];
-			jjold=jjold+1;
-		}
 		indexb[currentcreatedmapindex-1]=0;
 		jjold=0;
 		while(jjold<=19){
@@ -415,7 +427,7 @@ int startmemmap(int create,char *programlocation,char *id, mode_t permission){
 			map[currentcreatedmapindex-1][shmsize-(40-jjold)]='\0';
 			jjold=jjold+1;		
 		}
-		char* ididentfier="luisvmffastmmapmq\x17\x17\x17";
+		char* ididentfier=(char*)"luisvmffastmmapmq\x17\x17\x17";
 		jjold=0;
 		while(jjold<=19){
 			map[currentcreatedmapindex-1][shmsize-(20-jjold)]=ididentfier[jjold];
@@ -428,25 +440,18 @@ int startmemmap(int create,char *programlocation,char *id, mode_t permission){
 	}
 }
 void addresetcounter(int thismapindexreset){
-	char stra[9]="";
-	char *dataposbc;
-	dataposbc=stra;
-	int indexc=0;
-	sprintf(dataposbc,"%c%c",map[thismapindexreset][15],map[thismapindexreset][16]);
-	indexc=atoi(dataposbc);
-	indexc=indexc+1;
-	int vindexca=indexc/10;
-	map[thismapindexreset][15]=vindexca+'0';
-	map[thismapindexreset][16]=(indexc-vindexca*10)+'0';
+	uint32_t *indexaux1=(uint32_t*)(&(map[thismapindexreset][12]));
+	*indexaux1=*indexaux1+1;
+}
+int getresetcounter(int thismapindexreset){
+	uint32_t *indexaux1=(uint32_t*)(&(map[thismapindexreset][12]));
+	int aux=(int)*indexaux1;
+	return aux;
 }
 int writemmap(int writemapindexselect,  char *s) {
 	int jjold=0;
 	char stra[9]="";
 	char straold[9]="";
-	char *datapos;
-	char *dataposold;
-	datapos=stra;
-	dataposold=straold;
 	if(writemapindexselect<0){
 		perror("Invalid mmap id on write");
 		exit(EXIT_FAILURE);
@@ -455,28 +460,23 @@ int writemmap(int writemapindexselect,  char *s) {
 		perror("Invalid mmap id on write");
 		exit(EXIT_FAILURE);
 	}
-	//while(map[writemapindexselect][shmsize-42]=='A'){}  //XXX TODO Reuse this now unused memory position.
-	//while(map[writemapindexselect][shmsize-41]=='A'){}  //XXX TODO Reuse this now unused memory position.
-	//map[writemapindexselect][shmsize-42]='A';
-	lockfastmmapmq(futexpointers[writemapindexselect],lockmechanismconst,fd[writemapindexselect]);
-	jjold=0;
-	while(jjold<=6){
-		datapos[jjold]=map[writemapindexselect][jjold];
-		jjold=jjold+1;
+	uint32_t lockingaux;
+	 lockingaux=0;
+	if(map[writemapindexselect][shmsize-42]=='A'){
+		lockingaux=1;
 	}
+	lockfastmmapmq(futexpointers[writemapindexselect],lockingaux,fd[writemapindexselect]);
 	jjold=0;
-	while(jjold<=6){
-		dataposold[jjold]=map[writemapindexselect][jjold+8];
-		jjold=jjold+1;
-	}
-	int index=0;
-	int indexreadold=0;
+	uint32_t index=0;
+	uint32_t indexreadold=0;
 	int i=0;
 	int lenscalc=strlen(s);
-	index=atoi(datapos);
-	indexreadold=atoi(dataposold);
+	uint32_t *indexaux1=(uint32_t*)(&(map[writemapindexselect][0]));
+	index=*indexaux1;
+	uint32_t *indexaux2=(uint32_t*)(&(map[writemapindexselect][8]));
+	indexreadold=*indexaux2;
 	int writeupto=index+lenscalc+1;
-	if(map[writemapindexselect][7]=='\x17'){
+	if(map[writemapindexselect][16]=='\x17'){
 	if(index!=0){
 		writeupto=writeupto-17;
 		if(writeupto>bufferlength-1){
@@ -484,9 +484,7 @@ int writemmap(int writemapindexselect,  char *s) {
 		}
 		if((writeupto-lenscalc-1)<indexreadold){
 			if((writeupto)>=indexreadold){
-				//map[writemapindexselect][shmsize-41]='\0';
-				//map[writemapindexselect][shmsize-42]='\0';
-				unlockfastmmapmq(futexpointers[writemapindexselect],lockmechanismconst,fd[writemapindexselect]);
+				unlockfastmmapmq(futexpointers[writemapindexselect],lockingaux,fd[writemapindexselect]);
 				return -1;
 			}
 		}
@@ -524,46 +522,13 @@ int writemmap(int writemapindexselect,  char *s) {
 	if((i-2)<bufferlength+100)
 	map[writemapindexselect][i-2]=' ';
 	index=i-1;
-	int vca=index/1000000;
-	int aux=index-vca*1000000;
-	int vcb=(aux)/100000;
-	aux=aux-vcb*100000;
-	int vcc=(aux)/10000;
-	aux=aux-vcc*10000;
-	int vcd=(aux)/1000;
-	aux=aux-vcd*1000;
-	int vce=(aux)/100;
-	aux=aux-vce*100;
-	int vcf=(aux)/10;
-	aux=aux-vcf*10;
-	int vcg=(aux);
-	//map[writemapindexselect][shmsize-41]='A';
-	map[writemapindexselect][0]=vca+'0';
-	map[writemapindexselect][1]=vcb+'0';
-	map[writemapindexselect][2]=vcc+'0';
-	map[writemapindexselect][3]=vcd+'0';
-	map[writemapindexselect][4]=vce+'0';
-	map[writemapindexselect][5]=vcf+'0';
-	map[writemapindexselect][6]=vcg+'0';
+	uint32_t *pointerindex=(uint32_t*)(&(map[writemapindexselect][0]));
+	*pointerindex=index;
 	if(index>=bufferlength+18){
-		jjold=0;
-		while(jjold<=6){
-			map[writemapindexselect][jjold]='0';
-			jjold=jjold+1;
-		}
-		char *dataposbc;
-		dataposbc=stra;
-		int indexc=0;
-		sprintf(dataposbc,"%c%c",map[writemapindexselect][15],map[writemapindexselect][16]);
-		indexc=atoi(dataposbc);
-		indexc=indexc+1;
-		int vindexca=indexc/10;
-		map[writemapindexselect][15]=vindexca+'0';
-		map[writemapindexselect][16]=(indexc-vindexca*10)+'0';
+		*pointerindex=0;
+		addresetcounter(writemapindexselect);
 	}
-	//map[writemapindexselect][shmsize-41]='\0';
-	//map[writemapindexselect][shmsize-42]='\0';
-	unlockfastmmapmq(futexpointers[writemapindexselect],lockmechanismconst,fd[writemapindexselect]);
+	unlockfastmmapmq(futexpointers[writemapindexselect],lockingaux,fd[writemapindexselect]);
    return 0;
 }
 char *readmmap(int readmapindexselect,int gfifghdughfid) {
@@ -576,9 +541,13 @@ char *readmmap(int readmapindexselect,int gfifghdughfid) {
 		perror("Invalid mmap id on read");
 		exit(EXIT_FAILURE);
 	}
+	uint32_t lockingaux;
+	lockingaux=0;
+	if(map[readmapindexselect][shmsize-42]=='A'){
+		lockingaux=1;
+	}
 	if(gfifghdughfid==0){
-		//char stra[maxmemreturnsize+100]="";
-		char *stra=malloc((maxmemreturnsize+100)*sizeof(char));
+		char *stra=(char *)malloc((maxmemreturnsize+100)*sizeof(char));
 		if(stra==NULL){
 			perror("Malloc fail on readmmap");
 			exit(EXIT_FAILURE);
@@ -591,34 +560,16 @@ char *readmmap(int readmapindexselect,int gfifghdughfid) {
 		char *tmpstr;
 		tmpstr=stra;
 		char strab[9]="";
-		char *datapos;
-		datapos=strab;
-		int index=0;
+		uint32_t index=0;
 		jjold=0;
-		//if(map[readmapindexselect][shmsize-41]=='A'){
-		//	return "";
-		//}
-		//map[readmapindexselect][shmsize-41]='A';
-		lockfastmmapmq(futexpointers[readmapindexselect],lockmechanismconst,fd[readmapindexselect]);
-		while(jjold<=6){
-			datapos[jjold]=map[readmapindexselect][jjold];
-			jjold=jjold+1;
-		}
-		//map[readmapindexselect][shmsize-41]='\0';
-		unlockfastmmapmq(futexpointers[readmapindexselect],lockmechanismconst,fd[readmapindexselect]);
-		index=atoi(datapos);
-		char *dataposb;
-		dataposb=strab;
+		lockfastmmapmq(futexpointers[readmapindexselect],lockingaux,fd[readmapindexselect]);
+		uint32_t *indexauxaa=(uint32_t*)(&(map[readmapindexselect][0]));
+		index=*indexauxaa;
 		indexb[readmapindexselect]=0;
 		jjold=0;
-		while(jjold<=6){
-			dataposb[jjold]=map[readmapindexselect][jjold+8];
-			jjold=jjold+1;
-		}
-		indexb[readmapindexselect]=atoi(dataposb);
-		char *dataposbc;
-		dataposbc=strab;
-		sprintf(dataposbc,"%c%c",map[readmapindexselect][15],map[readmapindexselect][16]);
+		uint32_t *indexauxbb=(uint32_t*)(&(map[readmapindexselect][8]));
+		indexb[readmapindexselect]=(int)*indexauxbb;
+		unlockfastmmapmq(futexpointers[readmapindexselect],lockingaux,fd[readmapindexselect]);
 		int i=indexb[readmapindexselect]+17;
 		if(indexb[readmapindexselect]==index-17){
 			tmpstr[0]='\0';
@@ -670,38 +621,16 @@ char *readmmap(int readmapindexselect,int gfifghdughfid) {
 			}
 		}
 		indexb[readmapindexselect]=indexb[readmapindexselect]+i-indexb[readmapindexselect]-17;
-		int vca=indexb[readmapindexselect]/1000000;
-		int vcb=(indexb[readmapindexselect]-vca*1000000)/100000;
-		int vcc=(indexb[readmapindexselect]-vca*1000000-vcb*100000)/10000;
-		int vcd=(indexb[readmapindexselect]-vca*1000000-vcb*100000-vcc*10000)/1000;
-		int vce=(indexb[readmapindexselect]-vca*1000000-vcb*100000-vcc*10000-vcd*1000)/100;
-		int vcf=(indexb[readmapindexselect]-vca*1000000-vcb*100000-vcc*10000-vcd*1000-vce*100)/10;
-		int vcg=(indexb[readmapindexselect]-vca*1000000-vcb*100000-vcc*10000-vcd*1000-vce*100-vcf*10);
-		//if(map[readmapindexselect][shmsize-41]=='A'){
-		//	return "";
-		//}
-		//map[readmapindexselect][shmsize-41]='A';
-		lockfastmmapmq(futexpointers[readmapindexselect],lockmechanismconst,fd[readmapindexselect]);
-		map[readmapindexselect][8]=vca+'0';
-		map[readmapindexselect][9]=vcb+'0';
-		map[readmapindexselect][10]=vcc+'0';
-		map[readmapindexselect][11]=vcd+'0';
-		map[readmapindexselect][12]=vce+'0';
-		map[readmapindexselect][13]=vcf+'0';
-		map[readmapindexselect][14]=vcg+'0';
-		//map[readmapindexselect][shmsize-41]='\0';
-		unlockfastmmapmq(futexpointers[readmapindexselect],lockmechanismconst,fd[readmapindexselect]);
+		lockfastmmapmq(futexpointers[readmapindexselect],lockingaux,fd[readmapindexselect]);
+		uint32_t *pointerindex=(uint32_t*)(&(map[readmapindexselect][8]));
+		*pointerindex=indexb[readmapindexselect];
+		unlockfastmmapmq(futexpointers[readmapindexselect],lockingaux,fd[readmapindexselect]);
 		return tmpstr;
 		}
 	}else{
-		map[readmapindexselect][7]='\x21';
-		//if(map[readmapindexselect][shmsize-41]=='A'){
-		//	return "";
-		//}
-		lockfastmmapmq(futexpointers[readmapindexselect],lockmechanismconst,fd[readmapindexselect]);
-		//map[readmapindexselect][shmsize-41]='A';
-		//char stra[maxmemreturnsize+100]="";
-		char *stra=malloc((maxmemreturnsize+100)*sizeof(char));
+		map[readmapindexselect][16]='\x21';
+		lockfastmmapmq(futexpointers[readmapindexselect],lockingaux,fd[readmapindexselect]);
+		char *stra=(char *)malloc((maxmemreturnsize+100)*sizeof(char));
 		if(stra==NULL){
 			perror("Malloc fail on readmmap");
 			exit(EXIT_FAILURE);
@@ -714,29 +643,17 @@ char *readmmap(int readmapindexselect,int gfifghdughfid) {
 		char *tmpstr;
 		tmpstr=stra;
 		char strab[9]="";
-		char *datapos;
-		datapos=strab;
 		int index=0;
-		jjold=0;
-		while(jjold<=6){
-			datapos[jjold]=map[readmapindexselect][jjold];
-			jjold=jjold+1;
-		}
-		//map[readmapindexselect][shmsize-41]='\0';
-		unlockfastmmapmq(futexpointers[readmapindexselect],lockmechanismconst,fd[readmapindexselect]);
-		index=atoi(datapos);
-		char *dataposbc;
-		dataposbc=strab;
-		sprintf(dataposbc,"%c%c",map[readmapindexselect][15],map[readmapindexselect][16]);
+		uint32_t *pointerindex=(uint32_t*)(&(map[readmapindexselect][0]));
+		index=(int)*pointerindex;
+		unlockfastmmapmq(futexpointers[readmapindexselect],lockingaux,fd[readmapindexselect]);
 		int i=indexb[readmapindexselect]+17;
 		if(indexb[readmapindexselect]==index-17){
-			//map[readmapindexselect][shmsize-41]='\0';
 			tmpstr[0]='\0';
 			return tmpstr;
 		}else{
 		if(indexb[readmapindexselect]==index){
 			if(index==0){
-				//map[readmapindexselect][shmsize-41]='\0';
 				tmpstr[0]='\0';
 				return tmpstr;
 			}
@@ -787,22 +704,23 @@ char *readmmap(int readmapindexselect,int gfifghdughfid) {
 }
 int connectmmap(char *b,char *s) {
 	char *prog;
-	prog=malloc(strlen(b)+1);
+	prog=(char *)malloc(strlen(b)+1);
 	sprintf(prog,"%s",b);
 	mode_t permission=(mode_t)0000;
-	return startmemmap(0,prog,s,permission);
+	return startmemmap(0,prog,s,permission,1);
 }
-int createmmap(char *b,char *s) {
+int createmmap(char *b,char *s,int locking) {
 	char *prog;
-	prog=malloc(strlen(b)+1);
-	char *n="None";
+	prog=(char *)malloc(strlen(b)+1);
+	char *n=(char*)"None";
 	sprintf(prog,"%s",n);
 	char *perm=s;
 	mode_t permission=(((perm[0]=='r')*4|(perm[1]=='w')*2|(perm[2]=='x'))<<6)|(((perm[3]=='r')*4|(perm[4]=='w')*2|(perm[5]=='x'))<<3)|(((perm[6]=='r')*4|(perm[7]=='w')*2|(perm[8]=='x')));
-	return startmemmap(1,prog,b,permission);
+	int iaux=startmemmap(1,prog,b,permission,locking);
+	return iaux;
 }
 char *getsharedstring(int readmapindexselect) {
-	char *tmpstring=malloc(sharedstringsize+5);
+	char *tmpstring=(char *)malloc(sharedstringsize+5);
 	if(readmapindexselect<0){
 		perror("Invalid mmap id on read");
 		exit(EXIT_FAILURE);
@@ -811,9 +729,11 @@ char *getsharedstring(int readmapindexselect) {
 		perror("Invalid mmap id on read");
 		exit(EXIT_FAILURE);
 	}
-	//while(map[readmapindexselect][shmsize-42]=='A'){}
-	//map[readmapindexselect][shmsize-42]='A';
-	lockfastmmapmq(futexpointers[readmapindexselect],lockmechanismconst,fd[readmapindexselect]);
+	uint32_t lockingaux=0;
+	if(map[readmapindexselect][shmsize-42]=='A'){
+		lockingaux=1;
+	}
+	lockfastmmapmq(futexpointers[readmapindexselect],lockingaux,fd[readmapindexselect]);
 	int i=memmappedarraysize;
 	while(i<memmappedarraysize+sharedstringsize){
 		tmpstring[i-memmappedarraysize]=map[readmapindexselect][i];
@@ -822,8 +742,7 @@ char *getsharedstring(int readmapindexselect) {
 		}
 		i=i+1;
 	}
-	//map[readmapindexselect][shmsize-42]='\0';
-	unlockfastmmapmq(futexpointers[readmapindexselect],lockmechanismconst,fd[readmapindexselect]);
+	unlockfastmmapmq(futexpointers[readmapindexselect],lockingaux,fd[readmapindexselect]);
 	return tmpstring;
 }
 int writesharedstring(int readmapindexselect,char* tmpstring) {
@@ -836,9 +755,11 @@ int writesharedstring(int readmapindexselect,char* tmpstring) {
 		perror("Invalid mmap id on write");
 		exit(EXIT_FAILURE);
 	}
-	//while(map[readmapindexselect][shmsize-42]=='A'){}
-	//map[readmapindexselect][shmsize-42]='A';
-	lockfastmmapmq(futexpointers[readmapindexselect],lockmechanismconst,fd[readmapindexselect]);
+	uint32_t lockingaux=0;
+	if(map[readmapindexselect][shmsize-42]=='A'){
+		lockingaux=1;
+	}
+	lockfastmmapmq(futexpointers[readmapindexselect],lockingaux,fd[readmapindexselect]);
 	int i=memmappedarraysize;
 	while(i<memmappedarraysize+sharedstringsize){
 		map[readmapindexselect][i]=tmpstring[i-memmappedarraysize];
@@ -847,8 +768,6 @@ int writesharedstring(int readmapindexselect,char* tmpstring) {
 			break;
 		}
 	}
-	//map[readmapindexselect][i]='\0';
-	//map[readmapindexselect][shmsize-42]='\0';
-	unlockfastmmapmq(futexpointers[readmapindexselect],lockmechanismconst,fd[readmapindexselect]);
+	unlockfastmmapmq(futexpointers[readmapindexselect],lockingaux,fd[readmapindexselect]);
 	return 0;
 }

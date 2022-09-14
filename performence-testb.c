@@ -16,9 +16,10 @@ int main(void){
 	int j=0;
 	while(1){
 		//writemmap(mapid,"aaab");
-		char *a=readmmap(mapid,1);
+		char *a=readmmap(mapid,0);
 	int i=0;
     for(i=0; a[i] != '\0'; i++){}
+	//if(i!=0)
 	//printf("%s\n",a);
 	j=j+i;
 	free(a);

@@ -6,7 +6,7 @@
 
 
 void main(void){
-int mapid=createmmap("sendtestmmapid","rwx------");
+int mapid=createmmap("sendtestmmapid","rwx------",1);
 
 
 char *receive;

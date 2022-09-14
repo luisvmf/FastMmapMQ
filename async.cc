@@ -16,6 +16,9 @@
 #include <sys/time.h>
 #include "cmodule.c"
 
+
+//TODO get createmmap() locking type argument from nodejs
+
 using namespace v8;
 using v8::Function;
 using v8::Local;
@@ -90,7 +93,7 @@ class AsyncCreateWorker : public AsyncWorker {
 		  void Execute () {
 				const char *str=nodeinternalstring.c_str(); //Program
 				const char *strb=nodeinternalstringb.c_str(); //id
-				nodeconretval=createmmap(str,strb);
+				nodeconretval=createmmap(str,strb,0);
 		  }
 		  void HandleOKCallback () {
 			Nan::HandleScope scope;
@@ -209,7 +212,7 @@ void createsync(const FunctionCallbackInfo<Value>& info) {
 	prog=malloc(strlen(internalstring.c_str())+1);
 	sprintf(prog,"%s",internalstring.c_str());
 	char *perm=internalstringb.c_str();
-	int nodeconretval=createmmap(prog,perm);
+	int nodeconretval=createmmap(prog,perm,0);
 	info.GetReturnValue().Set(nodeconretval);
 }
 void writesync(const FunctionCallbackInfo<Value>& info) {

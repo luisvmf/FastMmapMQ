@@ -13,6 +13,7 @@
 #include <sys/time.h>
 #include "cmodule.c"
 
+//TODO get createmmap() locking type argument from python
 
 
 static PyObject* writemessage(PyObject* self,  PyObject *args) {
@@ -61,7 +62,7 @@ static PyObject* pyinitmmap_create(PyObject* self,  PyObject *args) {
 	if (!PyArg_ParseTuple(args, "ss",&s,&perm)) {
 		return NULL;
 	}
-	return Py_BuildValue("i", createmmap(s,perm));
+	return Py_BuildValue("i", createmmap(s,perm,0));
 }
 static char mmap_docs_write[] =
    "write(id,'data'): Write 'data' into id message queue. id should be the value returned by connectmmap() or createmmap().";
