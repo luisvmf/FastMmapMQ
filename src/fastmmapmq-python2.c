@@ -13,8 +13,6 @@
 #include <sys/time.h>
 #include "fastmmapmq.c"
 
-//TODO get createmmap() locking type argument from python
-
 
 static PyObject* writemessage(PyObject* self,  PyObject *args) {
 	int writemapindexselect=0;
@@ -49,7 +47,10 @@ static PyObject* pygetsharedstring(PyObject* self,  PyObject *args) {
 	if (!PyArg_ParseTuple(args, "i",&readmapindexselect)) {
 		return NULL;
 	}
-	return Py_BuildValue("s", fastmmapmq_getsharedstring(readmapindexselect));
+	char *tmpretval=fastmmapmq_getsharedstring(readmapindexselect);
+	PyObject* tmpretvalb=Py_BuildValue("s", tmpretval);
+	free(tmpretval);
+	return tmpretvalb;
 }
 static PyObject* pywritesharedstring(PyObject* self,  PyObject *args) {
 	int readmapindexselect=-1;
@@ -62,10 +63,11 @@ static PyObject* pywritesharedstring(PyObject* self,  PyObject *args) {
 static PyObject* pyinitmmap_create(PyObject* self,  PyObject *args) {
 	char *s;
 	char *perm;
-	if (!PyArg_ParseTuple(args, "ss",&s,&perm)) {
+	int lockingmode;
+	if (!PyArg_ParseTuple(args, "ssi",&s,&perm,&lockingmode)) {
 		return NULL;
 	}
-	return Py_BuildValue("i", fastmmapmq_createmmap(s,perm,0));
+	return Py_BuildValue("i", fastmmapmq_createmmap(s,perm,lockingmode));
 }
 static char mmap_docs_write[] =
    "write(id,'data'): Write 'data' into id message queue. id should be the value returned by connectmmap() or createmmap().";
@@ -78,7 +80,7 @@ static char mmap_docs_connect[] =
    "connectmmap('filepath','id'): Connects to write/read messages from this id created by process in filepath.\
 The id can contain any characters valid in a file name (no / or null character).This function must be called before write() or read().Returns mmapid.\n";
 static char mmap_docs_create[] =
-   "createmmap('id','permissions'): Creates a mmap with id 'id' and permissions.\nExample of permission 'rwx------' or 'rwxrwxrwx'. If the user has no write and read permissions on the mmap the program will segfault.";
+   "createmmap('id','permissions','lockmechanism'): Creates a mmap with id 'id' and permissions, using locking mode lockmechanism=0 for futex+spinlock and lockmechanism=1 for flock. Futex lock is faster but a deadlock may occur if one of the processes is terminated while a writemmap/ readmmap call is on progress. If the programs doing the read/write are independent, it is recommended using the flock, unless performance is critical..\nExample of permission 'rwx------' or 'rwxrwxrwx'. If the user has no write and read permissions on the mmap the program will segfault.";
 static char mmap_docs_get_shared[] =
    "getsharedstring(id): Get a shared string that is avaliable to all programs connected to this mmap. id should be the value returned by connectmmap() or createmmap().";
 static char mmap_docs_write_shared[] =
@@ -92,6 +94,6 @@ static PyMethodDef mmap_funcs[] = {
 	{"writesharedstring", (PyCFunction)pywritesharedstring, METH_VARARGS, mmap_docs_write_shared},
 	{ NULL, NULL, 0, NULL}
 };
-void initfastmmap(void) {
-	Py_InitModule3("fastmmap", mmap_funcs,"Fast IPC with mmap");
+void initfastmmapmq(void) {
+	Py_InitModule3("fastmmapmq", mmap_funcs,"Fast Message queue module, witch can pass messages between different processes, for Python, nodejs and c.");
 }
