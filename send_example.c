@@ -4,6 +4,7 @@
 #include <string.h>
 #include <unistd.h>
 
+//TODO check program hang without sleep
 
 void main(void){
 	printf("Connecting...\n");
