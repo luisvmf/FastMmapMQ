@@ -9,7 +9,7 @@
   "targets": [
     {
       "target_name": "fastmmapmq",
-      "sources": [ "async.cc" ],
+      "sources": [ "fastmmapmq-node.cc" ],
       "include_dirs" : ["<!(node -e \"require('nan')\")"]
     }
   ],

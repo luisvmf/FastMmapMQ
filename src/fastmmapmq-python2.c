@@ -11,7 +11,7 @@
 #include <dirent.h> 
 #include <time.h>
 #include <sys/time.h>
-#include "cmodule.c"
+#include "fastmmapmq.c"
 
 //TODO get createmmap() locking type argument from python
 
@@ -22,7 +22,7 @@ static PyObject* writemessage(PyObject* self,  PyObject *args) {
 	if (!PyArg_ParseTuple(args, "is", &writemapindexselect, &s)) {
 		return NULL;
 	}
-   return Py_BuildValue("i", writemmap(writemapindexselect,s));
+   return Py_BuildValue("i", fastmmapmq_writemmap(writemapindexselect,s));
 }
 static PyObject* readmessage(PyObject* self,  PyObject *args) {
 	int readmapindexselect=0;
@@ -30,7 +30,10 @@ static PyObject* readmessage(PyObject* self,  PyObject *args) {
 	if (!PyArg_ParseTuple(args, "ii", &readmapindexselect, &modemmap)) {
 		return NULL;
 	}
-	return Py_BuildValue("s", readmmap(readmapindexselect,modemmap));
+	char *tmpretval=fastmmapmq_readmmap(readmapindexselect,modemmap);
+	PyObject* tmpretvalb=Py_BuildValue("s", tmpretval);
+	free(tmpretval);
+	return tmpretvalb;
 
 }
 static PyObject* pyinitmmap(PyObject* self,  PyObject *args) {
@@ -39,14 +42,14 @@ static PyObject* pyinitmmap(PyObject* self,  PyObject *args) {
 	if (!PyArg_ParseTuple(args, "ss",&b,&s)) {
 		return NULL;
 	}
-	return Py_BuildValue("i", connectmmap(b,s));
+	return Py_BuildValue("i", fastmmapmq_connectmmap(b,s));
 }
 static PyObject* pygetsharedstring(PyObject* self,  PyObject *args) {
 	int readmapindexselect=-1;
 	if (!PyArg_ParseTuple(args, "i",&readmapindexselect)) {
 		return NULL;
 	}
-	return Py_BuildValue("s", getsharedstring(readmapindexselect));
+	return Py_BuildValue("s", fastmmapmq_getsharedstring(readmapindexselect));
 }
 static PyObject* pywritesharedstring(PyObject* self,  PyObject *args) {
 	int readmapindexselect=-1;
@@ -54,7 +57,7 @@ static PyObject* pywritesharedstring(PyObject* self,  PyObject *args) {
 	if (!PyArg_ParseTuple(args, "is",&readmapindexselect,&tmpstring)) {
 		return NULL;
 	}
-	return Py_BuildValue("i", writesharedstring(readmapindexselect,tmpstring));
+	return Py_BuildValue("i", fastmmapmq_writesharedstring(readmapindexselect,tmpstring));
 }
 static PyObject* pyinitmmap_create(PyObject* self,  PyObject *args) {
 	char *s;
@@ -62,7 +65,7 @@ static PyObject* pyinitmmap_create(PyObject* self,  PyObject *args) {
 	if (!PyArg_ParseTuple(args, "ss",&s,&perm)) {
 		return NULL;
 	}
-	return Py_BuildValue("i", createmmap(s,perm,0));
+	return Py_BuildValue("i", fastmmapmq_createmmap(s,perm,0));
 }
 static char mmap_docs_write[] =
    "write(id,'data'): Write 'data' into id message queue. id should be the value returned by connectmmap() or createmmap().";

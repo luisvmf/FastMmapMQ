@@ -14,7 +14,7 @@
 #include <dirent.h>
 #include <time.h>
 #include <sys/time.h>
-#include "cmodule.c"
+#include "fastmmapmq.c"
 
 
 //TODO get createmmap() locking type argument from nodejs
