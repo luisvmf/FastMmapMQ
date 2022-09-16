@@ -4,7 +4,6 @@
 #include <string.h>
 #include <unistd.h>
 
-//TODO check program hang without sleep
 
 void main(void){
 	int mapid=fastmmapmq_createmmap("sendtestmmapid","rwx------",1);
