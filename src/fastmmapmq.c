@@ -68,7 +68,7 @@ typedef struct{
 }fastmmapmq_instance;
 
 //Global fastmmapmq state.
-fastmmapmq_instance fastmmapmq_fastmmapinstance={.initialized=0};
+fastmmapmq_instance fastmmapmq_fastmmapinstance={.memmappedarraysize=0,.shmsize=0,.initialized=0};
 
 void fastmmapmq_initfastmmapmq(){
 	fastmmapmq_fastmmapinstance.memmappedarraysize=(fastmmapmq_bufferlength+100);
