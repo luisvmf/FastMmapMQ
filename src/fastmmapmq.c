@@ -793,3 +793,58 @@ int fastmmapmq_writesharedstring(int readmapindexselect,char* tmpstring) {
 	unlockfastmmapmq(fastmmapmq_fastmmapinstance.futexpointers[readmapindexselect],lockingaux,fastmmapmq_fastmmapinstance.fd[readmapindexselect]);
 	return 0;
 }
+
+
+int fastmmapmq_writesharedstring_withsize(int readmapindexselect,char* tmpstring,int sharedstrlenpriv) {
+	char stra[fastmmapmq_sharedstringsize+5]="";
+	if(readmapindexselect<0){
+		perror("Invalid mmap id on write");
+		exit(EXIT_FAILURE);
+	}
+	if(readmapindexselect>fastmmapmq_fastmmapinstance.currentcreatedmapindex){
+		perror("Invalid mmap id on write");
+		exit(EXIT_FAILURE);
+	}
+	uint32_t lockingaux=0;
+	if(fastmmapmq_fastmmapinstance.map[readmapindexselect][fastmmapmq_fastmmapinstance.shmsize-42]=='A'){
+		lockingaux=1;
+	}
+	lockfastmmapmq(fastmmapmq_fastmmapinstance.futexpointers[readmapindexselect],lockingaux,fastmmapmq_fastmmapinstance.fd[readmapindexselect]);
+	int i=fastmmapmq_fastmmapinstance.memmappedarraysize;
+	while(i<fastmmapmq_fastmmapinstance.memmappedarraysize+fastmmapmq_sharedstringsize){
+		fastmmapmq_fastmmapinstance.map[readmapindexselect][i]=tmpstring[i-fastmmapmq_fastmmapinstance.memmappedarraysize];
+		i=i+1;
+		if(i-fastmmapmq_fastmmapinstance.memmappedarraysize-1>=sharedstrlenpriv){
+			break;
+		}
+	}
+	unlockfastmmapmq(fastmmapmq_fastmmapinstance.futexpointers[readmapindexselect],lockingaux,fastmmapmq_fastmmapinstance.fd[readmapindexselect]);
+	return 0;
+}
+
+char *fastmmapmq_getsharedstring_withsize(int readmapindexselect,int sharedstrlenpri) {
+	char *tmpstring=(char *)malloc(fastmmapmq_sharedstringsize+5);
+	if(readmapindexselect<0){
+		perror("Invalid mmap id on read");
+		exit(EXIT_FAILURE);
+	}
+	if(readmapindexselect>fastmmapmq_fastmmapinstance.currentcreatedmapindex){
+		perror("Invalid mmap id on read");
+		exit(EXIT_FAILURE);
+	}
+	uint32_t lockingaux=0;
+	if(fastmmapmq_fastmmapinstance.map[readmapindexselect][fastmmapmq_fastmmapinstance.shmsize-42]=='A'){
+		lockingaux=1;
+	}
+	lockfastmmapmq(fastmmapmq_fastmmapinstance.futexpointers[readmapindexselect],lockingaux,fastmmapmq_fastmmapinstance.fd[readmapindexselect]);
+	int i=fastmmapmq_fastmmapinstance.memmappedarraysize;
+	while(i<fastmmapmq_fastmmapinstance.memmappedarraysize+fastmmapmq_sharedstringsize){
+		tmpstring[i-fastmmapmq_fastmmapinstance.memmappedarraysize]=fastmmapmq_fastmmapinstance.map[readmapindexselect][i];
+		if(i-fastmmapmq_fastmmapinstance.memmappedarraysize-1>=sharedstrlenpriv){
+			break;
+		}
+		i=i+1;
+	}
+	unlockfastmmapmq(fastmmapmq_fastmmapinstance.futexpointers[readmapindexselect],lockingaux,fastmmapmq_fastmmapinstance.fd[readmapindexselect]);
+	return tmpstring;
+}

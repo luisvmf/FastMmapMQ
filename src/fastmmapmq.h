@@ -12,4 +12,6 @@
 	int fastmmapmq_createmmap(char *b,char *s,int locking);
 	char *fastmmapmq_getsharedstring(int readmapindexselect);
 	int fastmmapmq_writesharedstring(int readmapindexselect,char* tmpstring);
+	int fastmmapmq_writesharedstring_withsize(int readmapindexselect,char* tmpstring,int sharedstrlenpriv);
+	char *fastmmapmq_getsharedstring_withsize(int readmapindexselect,int sharedstrlenpri);
 #endif
