@@ -822,7 +822,7 @@ int fastmmapmq_writesharedstring_withsize(int readmapindexselect,char* tmpstring
 	return 0;
 }
 
-char *fastmmapmq_getsharedstring_withsize(int readmapindexselect,int sharedstrlenpri) {
+char *fastmmapmq_getsharedstring_withsize(int readmapindexselect,int sharedstrlenpriv) {
 	char *tmpstring=(char *)malloc(fastmmapmq_sharedstringsize+5);
 	if(readmapindexselect<0){
 		perror("Invalid mmap id on read");
