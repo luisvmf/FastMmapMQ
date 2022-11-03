@@ -840,10 +840,10 @@ char *fastmmapmq_getsharedstring_withsize(int readmapindexselect,int sharedstrle
 	int i=fastmmapmq_fastmmapinstance.memmappedarraysize;
 	while(i<fastmmapmq_fastmmapinstance.memmappedarraysize+fastmmapmq_sharedstringsize){
 		tmpstring[i-fastmmapmq_fastmmapinstance.memmappedarraysize]=fastmmapmq_fastmmapinstance.map[readmapindexselect][i];
+		i=i+1;
 		if(i-fastmmapmq_fastmmapinstance.memmappedarraysize-1>=sharedstrlenpriv){
 			break;
 		}
-		i=i+1;
 	}
 	unlockfastmmapmq(fastmmapmq_fastmmapinstance.futexpointers[readmapindexselect],lockingaux,fastmmapmq_fastmmapinstance.fd[readmapindexselect]);
 	return tmpstring;
