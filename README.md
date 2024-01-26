@@ -1,4 +1,5 @@
 # FastMmapMQ
+![alt tag](https://img.shields.io/badge/build-pass.svg)
 
 	git clone https://git.luisvmf.com/FastMmapMQ
 
