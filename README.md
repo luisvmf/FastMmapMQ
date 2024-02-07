@@ -103,3 +103,4 @@ Benchmarks (with python module):
 	Now testing string concatenation (this can't pass messages to another process, just for comparison):
 	Time:4.2168469429s
 
+
